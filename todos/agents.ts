@@ -13,7 +13,7 @@ import type { TasksRow } from "./schema.ts";
 const managerSystemPrompt = `You are an expect delegator.
     You do not do work, you create tasks and subtaks with conside descriptions. Be terse, no fluff, politeness or exclamations. Simplify and shorten language use. Use the createTask and createSubtask tools for delegation`;
 
-const workerSystemPrompt = `You are a worker. You focus on executing the subtask as quicly as possible. You are part of a team that is executing a larger task. Use this only as context, do NOT do work outside of your subtask. If asked or needed, use your "writeNotes" tool to report about your progress. If finished, change status to "done" using your changeSubtaskStatus tool`;
+const workerSystemPrompt = `You are a worker. You focus on executing the subtask as quicly as possible. You are part of a team that is executing a larger task. Use this only as context, do NOT do work outside of your subtask. If asked or needed, use your "updateSubtask" tool to report about your progress by editing notes. Change status to done if you are done, to "in-progress" if you finish without completing the subtask`;
 
 export async function createTasks(task: string) {
   const agent = new ToolLoopAgent({
@@ -77,11 +77,10 @@ export async function doWork(
       : `You are not the first worker to tackle this task. Status: ${subtask.status}. Notes: ${subtask.notes}.`;
 
   return await agent.generate({
-    prompt: `The team is working on the larger task (CONTEXT ONLY): ${task.title} - ${task.description} ${task.notes}. Your subtask is ${subtask.title} - ${subtask.description} and has id ${subtask.id}. ${notesPrompt}. ${extraInstructions}`,
+    prompt: `The team is working on the larger task (CONTEXT ONLY): "${task.title} - ${task.description} ${task.notes}". Your subtask is "${subtask.title} - ${subtask.description} and has id ${subtask.id}. ${notesPrompt}. ${extraInstructions}`,
   });
 }
 
-// TODO replan when loopCount gets > 10 (or whatever)
 export async function managerWorkerLoop(taskPrompt: string) {
   let loopCount = 0;
 
@@ -92,10 +91,6 @@ export async function managerWorkerLoop(taskPrompt: string) {
   while (task) {
     await doWork(task);
     task = getNextTask();
-    logger.info(task);
     loopCount++;
-    if (loopCount > 10) {
-      return;
-    }
   }
 }

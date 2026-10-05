@@ -173,7 +173,7 @@ export const updateSubtaskWorkerTool = tool({
       // handoff notes (which would otherwise make the manager's handoff prompt
       // dead and strand the worker on the same subtask forever).
       const changes = { status };
-      if (notes && notes !== "") changes.notes = notes;
+      if (notes && notes !== "") changes["notes"] = notes;
 
       await crud.updateSubtask(subtaskId, changes);
       return { error: null };

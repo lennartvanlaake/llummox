@@ -1,16 +1,7 @@
 import { readdir } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { $ } from "bun";
-import z from "zod";
-
-export const StateDef = z.object({
-  url: z.string(),
-  project: z.string(),
-  originDir: z.string().default(""),
-  targetDir: z.string().default(""),
-});
-
-type StateType = z.infer<typeof StateDef>;
+import type { MainStateType } from ".";
 
 function getBaseOriginDir(project: string) {
   return `${import.meta.dir}/projects/${project}/original`;
@@ -25,17 +16,17 @@ function directoryNotEmpty(dir: string) {
   return (async () => (await readdir(dir)).length > 0)();
 }
 
-function checkOriginNeedsInit(state: StateType): boolean {
+function checkOriginNeedsInit(state: MainStateType): boolean {
   return !directoryNotEmpty(getBaseOriginDir(state.project));
 }
 
-function checkTargetNeedsInit(state: StateType): boolean {
+function checkTargetNeedsInit(state: MainStateType): boolean {
   // Run target init only when target is empty; a fresh clone means dirs are set.
   const targetDir = getBaseTargetDir(state.project);
   return existsSync(targetDir) ? !directoryNotEmpty(targetDir) : true;
 }
 
-export async function init(state: StateType): Promise<StateType> {
+export async function init(state: MainStateType): Promise<MainStateType> {
   if (checkOriginNeedsInit(state)) {
     const originDir = getBaseOriginDir(state.project);
     await $`mkdir -p ${originDir}`;
@@ -44,9 +35,10 @@ export async function init(state: StateType): Promise<StateType> {
 
   if (checkTargetNeedsInit(state)) {
     const targetDir = getBaseTargetDir(state.project);
+    debugger;
     await $`mkdir -p ${targetDir}`;
-    await $`cd ${targetDir}`;
-    await $`git clone git@github.com:lennartvanlaake/hugolify-template.git`;
+    // TODO adjust to astro template
+    await $`git clone git@github.com:lennartvanlaake/hugolify-template.git ${targetDir}`;
     state.targetDir = `${targetDir}`;
   }
 

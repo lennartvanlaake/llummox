@@ -8,7 +8,9 @@ const MainState = z.object({
   targetDir: z.string().default(""),
 });
 
-export async function run(state: z.infer<typeof MainState>) {
+export type MainStateType = z.infer<typeof MainState>;
+
+export async function run(state: MainStateType) {
   await init({
     url: state.url,
     project: state.project,
@@ -16,3 +18,10 @@ export async function run(state: z.infer<typeof MainState>) {
     targetDir: state.targetDir,
   });
 }
+
+await run({
+  url: "https://motherfuckingwebsite.com",
+  project: "mf",
+  originDir: "",
+  targetDir: "",
+});
