@@ -19,9 +19,9 @@ export async function run(state: MainStateType) {
   });
 }
 
-await run({
-  url: "https://motherfuckingwebsite.com",
-  project: "mf",
-  originDir: "",
-  targetDir: "",
-});
+// await run({
+//   url: "https://motherfuckingwebsite.com",
+//   project: "mf",
+//   originDir: "",
+//   targetDir: "",
+// });

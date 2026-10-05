@@ -73,18 +73,13 @@ export const updateTaskTool = tool({
       .describe("New notes. Omit to leave unchanged."),
   }),
   outputSchema: z.object({
-    error: z.string().nullable,
-    changes: z.object({
-      title: z.string(),
-      description: z.string(),
-      status: z.string(),
-      notes: z.string(),
-    }),
+    error: z.string().optional(),
   }),
-  execute: async ({ taskId, title, description, status, notes }) => {
+  execute: async (input) => {
     try {
-      const before = await crud.getTask(taskId);
-      if (!before) throw new Error(`Task with id ${taskId} does not exist`);
+      const before = crud.getTask(input.taskId);
+      if (!before)
+        throw new Error(`Task with id ${input.taskId} does not exist`);
       const changes = {
         title: before.title,
         description: before.description,
@@ -92,13 +87,14 @@ export const updateTaskTool = tool({
         notes: before.notes,
       };
 
-      if (title !== undefined) changes.title = title;
-      if (description !== undefined) changes.description = description;
-      if (status !== undefined) changes.status = status;
-      if (notes !== undefined) changes.notes = notes;
+      if (input.title !== undefined) changes.title = input.title;
+      if (input.description !== undefined)
+        changes.description = input.description;
+      if (input.status !== undefined) changes.status = input.status;
+      if (input.notes !== undefined) changes.notes = input.notes;
 
-      await crud.updateTask(taskId, changes);
-      return { error: null, changes };
+      await crud.updateTask(input.taskId, changes);
+      return {};
     } catch (e) {
       return { error: `error: ${(e as Error).message}` };
     }
@@ -106,6 +102,28 @@ export const updateTaskTool = tool({
 });
 
 // ---- Subtask tools --------------------------------------------------------
+//
+
+export const getSubtasksTool = tool({
+  description: "Gets all subtasks of a task",
+  inputSchema: z.object({ taskId: z.string() }),
+  outputSchema: z.array(
+    z.object({
+      id: z.string(),
+      title: z.string(),
+      description: z.string(),
+      notes: z.string(),
+      status: z.string(),
+    }),
+  ),
+  execute: async (input) => {
+    const subtasks = crud.getSubtasks(input.taskId);
+    return subtasks.map((it) => {
+      const { id, title, description, notes, status } = it;
+      return { id, title, description, notes, status };
+    });
+  },
+});
 
 export const createSubtaskTool = tool({
   description: "Create a subtask. Requires a taskId obtained by creating task.",
@@ -120,17 +138,15 @@ export const createSubtaskTool = tool({
     taskId: z.string().describe("Task id (uuid) this subtask belongs to."),
   }),
   outputSchema: z.object({
-    taskId: z.string().nullable(),
-    subTaskId: z.string().nullable(),
-    error: z.string().nullable(),
+    taskId: z.string().optional(),
+    subTaskId: z.string().optional(),
+    error: z.string().optional(),
   }),
   execute: async ({ title, description, taskId }) => {
     // Validate the task exists so we never create an orphaned subtask.
     const task = crud.getTask(taskId);
     if (!task) {
       return {
-        taskId,
-        subTaskId: null,
         error: `task ${taskId} does not exist`,
       };
     }
@@ -141,11 +157,9 @@ export const createSubtaskTool = tool({
         taskId,
       });
 
-      return { taskId, subTaskId: subtask.id, error: null };
+      return { taskId, subTaskId: subtask.id };
     } catch (e: any) {
       return {
-        taskId,
-        subTaskId: null,
         error: `${e.message}`,
       };
     }
