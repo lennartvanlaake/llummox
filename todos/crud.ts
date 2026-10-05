@@ -1,4 +1,4 @@
-import { eq, and, desc, notInArray } from "drizzle-orm";
+import { eq, and, desc } from "drizzle-orm";
 import {
   tasksTable,
   subtasksTable,
@@ -9,7 +9,6 @@ import {
 import { db } from "./db";
 import { randomUUIDv7 } from "bun";
 import { TaskStatus } from "./constants";
-import { logger } from "../shared/utils";
 
 //
 // ---- Tasks ----
@@ -63,17 +62,17 @@ export async function deleteTask(id: string) {
 export function getNextTask() {
   const progress = db
     .select()
-    .from(subtasksTable)
-    .where(and(eq(subtasksTable.status, TaskStatus["in-progress"])))
+    .from(tasksTable)
+    .where(eq(tasksTable.status, TaskStatus["in-progress"]))
     .get();
   if (progress) {
     return progress;
   }
   const todo = db
     .select()
-    .from(subtasksTable)
-    .where(and(eq(subtasksTable.status, TaskStatus["todo"])))
-    .orderBy(desc(subtasksTable.createdAt))
+    .from(tasksTable)
+    .where(eq(tasksTable.status, TaskStatus["todo"]))
+    .orderBy(desc(tasksTable.createdAt))
     .limit(1)
     .get();
 
@@ -101,6 +100,11 @@ export function getSubtasks(taskId: string) {
     .all();
 }
 
+// ponytail: all subtasks across every task in one scan.
+export function getSubtasksAll() {
+  return db.select().from(subtasksTable).all();
+}
+
 // ponytail: O(n) scan per update, global lock. Per-task locks if concurrency matters.
 export function recomputeTaskStatus(taskId: string) {
   const subtasks = getSubtasks(taskId);
@@ -111,11 +115,9 @@ export function recomputeTaskStatus(taskId: string) {
   const active = subtasks.some((s) => s.status !== TaskStatus["todo"]);
   // ponytail: task is done only when ALL subtasks are done; an in-progress
   // subtask keeps the task in-progress even alongside a done one.
-  return done.length === subtasks.length
-    ? TaskStatus["done"]
-    : active
-      ? TaskStatus["in-progress"]
-      : TaskStatus["todo"];
+  if (done.length === subtasks.length) return TaskStatus["done"];
+  else if (active) return TaskStatus["in-progress"];
+  else return TaskStatus["todo"];
 }
 
 export function getNextSubtask(taskId: string) {

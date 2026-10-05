@@ -26,6 +26,15 @@ describe("crud tasks", () => {
 
   it("getNextTask: ignores done tasks", async () => {
     setupDatabase(":memory:");
+    const d = await crud.createTask({
+      title: "done",
+      description: "d",
+    });
+    expect(crud.getNextTask()!.id).toBe(d.id);
+  });
+
+  it("getNextTask: ignores done tasks", async () => {
+    setupDatabase(":memory:");
     const d = await crud.createTask({ title: "done", description: "d" });
     await crud.updateTask(d.id, { status: TaskStatus["done"] });
     expect(crud.getNextTask()).toBeNull();

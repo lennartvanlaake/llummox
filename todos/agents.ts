@@ -77,7 +77,7 @@ export async function doWork(
       : `You are not the first worker to tackle this task. Status: ${subtask.status}. Notes: ${subtask.notes}.`;
 
   return await agent.generate({
-    prompt: `The team is working on the larger task (CONTEXT ONLY): ${task.title} - ${task.description} ${task.notes}. Your subtask is ${subtask.title} - ${subtask.description}. ${notesPrompt}. ${extraInstructions}`,
+    prompt: `The team is working on the larger task (CONTEXT ONLY): ${task.title} - ${task.description} ${task.notes}. Your subtask is ${subtask.title} - ${subtask.description} and has id ${subtask.id}. ${notesPrompt}. ${extraInstructions}`,
   });
 }
 
@@ -90,7 +90,7 @@ export async function managerWorkerLoop(taskPrompt: string) {
   logger.info(task);
 
   while (task) {
-    doWork(task);
+    await doWork(task);
     task = getNextTask();
     logger.info(task);
     loopCount++;
