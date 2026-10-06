@@ -58,30 +58,6 @@ export async function deleteTask(id: string) {
     .returning();
   return row.length > 0;
 }
-
-export function getNextTask() {
-  const progress = db
-    .select()
-    .from(tasksTable)
-    .where(eq(tasksTable.status, TaskStatus["in-progress"]))
-    .get();
-  if (progress) {
-    return progress;
-  }
-  const todo = db
-    .select()
-    .from(tasksTable)
-    .where(eq(tasksTable.status, TaskStatus["todo"]))
-    .orderBy(desc(tasksTable.createdAt))
-    .limit(1)
-    .get();
-
-  if (todo) {
-    return todo;
-  }
-  return null;
-}
-
 //
 // ---- Subtasks ----
 //
@@ -173,10 +149,6 @@ export function listSubtasks(taskId: string) {
     .all();
 }
 
-// TODO updating subtask status should update task status. Rules:
-// - all subtasks done: task done
-// - some subtasks done or in-progress: task in-progress
-// - all subtasks to-do: task todo
 export async function updateSubtask(
   id: string,
   input: Partial<SubtasksInsert>,

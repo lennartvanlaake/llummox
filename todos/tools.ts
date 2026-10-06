@@ -5,64 +5,11 @@ import { TASK_STATUSES } from "./constants";
 
 // ---- Task (story) tools ---------------------------------------------------
 
-export const createTaskTool = tool({
-  description: "Create a task. Returns uuid of task at `taskId` or `error`",
-  inputSchema: z.object({
-    title: z.string().describe("Task title."),
-    description: z.string().describe("Acceptance-relevant description."),
-  }),
-  outputSchema: z.object({
-    taskId: z.string(),
-    error: z.string(),
-  }),
-  execute: async ({ title, description }) => {
-    try {
-      const task = await crud.createTask({ title, description });
-      return { taskId: task.id, error: "" };
-    } catch (e: any) {
-      return { taskId: "", error: e.message };
-    }
-  },
-});
-
-export const updateTaskStatusTool = tool({
-  description:
-    "Move a task (story) between states. Use during planning: 'todo' (planned, not started), 'in-progress' (being done now), 'blocked' (add reason in notes), 'done'",
-  inputSchema: z.object({
-    taskId: z.string().describe("Task id to update."),
-    status: z
-      .enum(TASK_STATUSES)
-      .describe("New status: 'todo' | 'in-progress' | 'blocked' | 'done'."),
-  }),
-  outputSchema: z.object({
-    error: z.string().nullable,
-  }),
-  execute: async ({ taskId, status }) => {
-    try {
-      const task = await crud.updateTask(taskId, { status });
-      if (!task) {
-        return { error: `No task found with id ${taskId}.` };
-      }
-      return { error: null };
-    } catch (e) {
-      return { error: `error: ${(e as Error).message}` };
-    }
-  },
-});
-
 export const updateTaskTool = tool({
   description:
     "Update fields of a task (story). Providing a field changes it; omit it to leave it unchanged. Empty string clears a text field.",
   inputSchema: z.object({
     taskId: z.string().describe("Task id to update."),
-    title: z
-      .string()
-      .optional()
-      .describe("New title. Omit to leave unchanged."),
-    description: z
-      .string()
-      .optional()
-      .describe("New description. Omit to leave unchanged."),
     status: z
       .string()
       .optional()
@@ -81,15 +28,10 @@ export const updateTaskTool = tool({
       if (!before)
         throw new Error(`Task with id ${input.taskId} does not exist`);
       const changes = {
-        title: before.title,
-        description: before.description,
         status: before.status,
         notes: before.notes,
       };
 
-      if (input.title !== undefined) changes.title = input.title;
-      if (input.description !== undefined)
-        changes.description = input.description;
       if (input.status !== undefined) changes.status = input.status;
       if (input.notes !== undefined) changes.notes = input.notes;
 
