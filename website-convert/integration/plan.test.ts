@@ -10,21 +10,21 @@ describe("Testing the planning function", () => {
     registerTelemetry(DevToolsTelemetry() as any);
   });
 
-  // test("test planning on very small project", async () => {
-  //   await plan({
-  //     url: "",
-  //     project: "mf",
-  //     originDir: `${import.meta.dir}/fixtures/mf/original`,
-  //     targetDir: "",
-  //   });
-  // }, 0);
-
-  test("test planning on larger project", async () => {
+  test("test planning on very small project", async () => {
     await plan({
       url: "",
       project: "mf",
-      originDir: `${import.meta.dir}/fixtures/portfolio/original`,
+      originDir: `${import.meta.dir}/fixtures/mf/original`,
       targetDir: "",
     });
   }, 0);
+
+  // test("test planning on larger project", async () => {
+  //   await plan({
+  //     url: "",
+  //     project: "mf",
+  //     originDir: `${import.meta.dir}/fixtures/portfolio/original`,
+  //     targetDir: "",
+  //   });
+  // }, 0);
 });

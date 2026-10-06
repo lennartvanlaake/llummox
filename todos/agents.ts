@@ -16,8 +16,7 @@ import { logger } from "../shared/utils.ts";
 import { TaskStatus } from "./constants.ts";
 import type { SubtasksRow, TasksRow } from "./schema.ts";
 
-const managerSystemPrompt = `You are an expect delegator.
-    You do not do work. Create subtasks with conside descriptions. Be terse, no fluff, politeness or exclamations. Simplify and shorten language use. Use the createSubtask tool for delegation.`;
+const managerSystemPrompt = `You are an expect delegator. Create subtasks with conside descriptions. Be terse, no fluff, politeness or exclamations. Simplify and shorten language use. Use the createSubtask tool for delegation. EXTREMELY IMPORTANT: You are not allowed under any circumstance to complete the subtasks yourself. `;
 
 const workerSystemPrompt = `You are a worker. You focus on executing the subtask as quickly as possible. You are part of a team that is executing a larger task. Use this only as context, do NOT do work outside of your subtask. If asked or needed, use your "updateSubtask" tool to report about your progress by editing notes. Change status to done if you are done, to "in-progress" if you finish without completing the subtask`;
 
@@ -29,7 +28,10 @@ export type WorkerConfig = {
   workingDir?: string;
 };
 
-export async function createTaskWithSubs(prompt: string) {
+export async function createTaskWithSubs(
+  prompt: string,
+  previousNotes: string = "",
+) {
   const task = await createTask({ prompt });
   const agent = new ToolLoopAgent({
     model: mainModel,
@@ -38,7 +40,7 @@ export async function createTaskWithSubs(prompt: string) {
   });
 
   await agent.generate({
-    prompt: `${prompt} The taskId which you use for creating subtasks is "${task.id}"`,
+    prompt: `${prompt} ${previousNotes ?? `. The notes from the previous task are ${previousNotes}. `}The taskId which you use for creating subtasks is "${task.id}"`,
   });
 
   return task;
@@ -108,29 +110,34 @@ async function summarize(task: TasksRow) {
     .map((it) => `Title: ${it.title}. Notes: ${it.notes}\n`)
     .join("");
 
-  return await agent.generate({
+  await agent.generate({
     prompt: `Summarize task with id ${task.id} and prompt ${task.prompt}. Subtasks: ${subtasksTemplate}`,
   });
+
+  return getTask(task.id);
 }
 
 export async function workOnPlan(
   prompts: string[],
   workerConfig: WorkerConfig,
 ) {
+  let previousTaskSummary = "";
   for (const prompt of prompts) {
-    const task = await workOnTask(prompt, workerConfig);
-    await summarize(task);
+    const task = await workOnTask(prompt, workerConfig, previousTaskSummary);
+    const summarized = await summarize(task);
+    previousTaskSummary = summarized?.notes ?? "";
   }
 }
 
 export async function workOnTask(
   taskPrompt: string,
   workerConfig: WorkerConfig,
+  previousTaskSummary: string,
 ) {
   let loopCount = 0;
 
   //
-  let task = await createTaskWithSubs(taskPrompt);
+  let task = await createTaskWithSubs(taskPrompt, previousTaskSummary);
 
   let subtask = getNextSubtask(task.id);
 
