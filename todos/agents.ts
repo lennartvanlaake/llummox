@@ -4,7 +4,7 @@ import {
   updateTaskTool,
 } from "./tools.ts";
 import { mainModel } from "../shared/models";
-import { ToolLoopAgent } from "ai";
+import { ToolLoopAgent, type Agent } from "ai";
 import {
   createTask,
   getNextSubtask,
@@ -22,23 +22,47 @@ const workerSystemPrompt = `You are a worker. You focus on executing the subtask
 
 const summarizerSystemPrompt = `You are an expect summarizer. You consolidate all the notes of the completed subtasks into the notes of a task. Use the updateTask tool to write the notes. Preserve all technical information, remove duplication or anything that is not relevant to the purpose of the task. Be terse and laconoic. Convey maximum information in minimum characters.`;
 
-export type WorkerConfig = {
-  tools?: Record<string, any>;
-  prompt?: string;
-  workingDir?: string;
+const defaultWorkerAgent = new ToolLoopAgent({
+  model: mainModel,
+  tools: {
+    updateSubtask: updateSubtaskWorkerTool,
+  },
+  instructions: workerSystemPrompt,
+  prepareStep: async ({ messages, stepNumber }) => {
+    if (stepNumber > 10) {
+      return {
+        messages: [
+          ...messages,
+          {
+            role: "user",
+            content:
+              "You are taking too long. Either finish your task now or adjust status and write notes for the next worker",
+          },
+        ],
+      };
+    }
+  },
+});
+
+const defaultManagerAgent = new ToolLoopAgent({
+  model: mainModel,
+  tools: { createSubtask: createSubtaskTool },
+  instructions: managerSystemPrompt,
+});
+
+type TaskConfig = {
+  prompt: string;
+  worker?: Agent;
+  manager?: Agent;
 };
 
 export async function createTaskWithSubs(
-  prompt: string,
+  taskConfig: TaskConfig,
   previousTask?: TasksRow,
 ) {
-  const task = await createTask({ prompt });
-  const agent = new ToolLoopAgent({
-    model: mainModel,
-    tools: { createSubtask: createSubtaskTool },
-    instructions: managerSystemPrompt,
-  });
+  const task = await createTask({ prompt: taskConfig.prompt });
 
+  const agent = taskConfig?.manager ?? defaultManagerAgent;
   await agent.generate({
     prompt: `${prompt} ${previousTask ?? `. The notes from the previous task with prompt ${previousTask!.prompt} are ${previousTask!.notes}. `}The taskId which you use for creating subtasks is "${task.id}"`,
   });
@@ -49,7 +73,7 @@ export async function createTaskWithSubs(
 export async function doWork(
   task: TasksRow,
   subtask: SubtasksRow,
-  workerConfig: WorkerConfig,
+  agent: Agent,
 ) {
   if (!subtask) {
     logger.info("No subtask found, returning");
@@ -59,34 +83,6 @@ export async function doWork(
   if (subtask.status === TaskStatus.todo) {
     updateSubtask(subtask.id, { status: TaskStatus["in-progress"] });
   }
-
-  // add SCRUM-middleware and RAG-middleware
-  const agent = new ToolLoopAgent({
-    model: mainModel,
-    tools: {
-      updateSubtask: updateSubtaskWorkerTool,
-      ...(workerConfig.tools ?? {}),
-    },
-    //@ts-ignore
-    toolsContext: workerConfig.workingDir
-      ? { ls: { workingDir: workerConfig.workingDir } }
-      : {},
-    instructions: workerSystemPrompt + (workerConfig.prompt ?? ""),
-    prepareStep: async ({ messages, stepNumber }) => {
-      if (stepNumber > 10) {
-        return {
-          messages: [
-            ...messages,
-            {
-              role: "user",
-              content:
-                "You are taking too long. Either finish your task now or adjust status and write notes for the next worker",
-            },
-          ],
-        };
-      }
-    },
-  });
 
   const notesPrompt =
     subtask.status == TaskStatus.todo
@@ -117,33 +113,30 @@ async function summarize(task: TasksRow) {
   return getTask(task.id);
 }
 
-export async function workOnPlan(
-  prompts: string[],
-  workerConfig: WorkerConfig,
-) {
+export async function workOnPlan(taskConfigs: TaskConfig[]) {
   let previousTask: TasksRow | undefined;
-  for (const prompt of prompts) {
-    const task = await workOnTask(prompt, workerConfig, previousTask);
+  for (const taskConfig of taskConfigs) {
+    const task = await workOnTask(taskConfig, previousTask);
     previousTask = await summarize(task);
   }
 }
 
 export async function workOnTask(
-  taskPrompt: string,
-  workerConfig: WorkerConfig,
+  taskConfig: TaskConfig,
   previousTask?: TasksRow,
 ) {
   let loopCount = 0;
 
   //
-  let task = await createTaskWithSubs(taskPrompt, previousTask);
+  let task = await createTaskWithSubs(taskConfig, previousTask);
 
   let subtask = getNextSubtask(task.id);
 
   while (subtask) {
     logger.info(subtask);
     try {
-      await doWork(task, subtask, workerConfig);
+      // TODO sort this out
+      await doWork(task, subtask, taskConfig?.worker ?? defaultWorkerAgent);
     } catch (e) {
       logger.error(e);
     }
