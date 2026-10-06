@@ -1,15 +1,27 @@
-import { createSubtaskTool, updateSubtaskWorkerTool } from "./tools.ts";
+import {
+  createSubtaskTool,
+  updateSubtaskWorkerTool,
+  updateTaskTool,
+} from "./tools.ts";
 import { mainModel } from "../shared/models";
 import { ToolLoopAgent } from "ai";
-import { createTask, getNextSubtask, getTask, updateSubtask } from "./crud.ts";
+import {
+  createTask,
+  getNextSubtask,
+  getSubtasks,
+  getTask,
+  updateSubtask,
+} from "./crud.ts";
 import { logger } from "../shared/utils.ts";
 import { TaskStatus } from "./constants.ts";
-import type { TasksRow } from "./schema.ts";
+import type { SubtasksRow, TasksRow } from "./schema.ts";
 
 const managerSystemPrompt = `You are an expect delegator.
     You do not do work. Create subtasks with conside descriptions. Be terse, no fluff, politeness or exclamations. Simplify and shorten language use. Use the createSubtask tool for delegation.`;
 
 const workerSystemPrompt = `You are a worker. You focus on executing the subtask as quickly as possible. You are part of a team that is executing a larger task. Use this only as context, do NOT do work outside of your subtask. If asked or needed, use your "updateSubtask" tool to report about your progress by editing notes. Change status to done if you are done, to "in-progress" if you finish without completing the subtask`;
+
+const summarizerSystemPrompt = `You are an expect summarizer. You consolidate all the notes of the completed subtasks into the notes of a task. Use the updateTask tool to write the notes. Preserve all technical information, remove duplication or anything that is not relevant to the purpose of the task. Be terse and laconoic. Convey maximum information in minimum characters.`;
 
 export type WorkerConfig = {
   tools?: Record<string, any>;
@@ -21,7 +33,7 @@ export async function createTaskWithSubs(prompt: string) {
   const task = await createTask({ prompt });
   const agent = new ToolLoopAgent({
     model: mainModel,
-    tools: { reateSubtask: createSubtaskTool },
+    tools: { createSubtask: createSubtaskTool },
     instructions: managerSystemPrompt,
   });
 
@@ -32,9 +44,11 @@ export async function createTaskWithSubs(prompt: string) {
   return task;
 }
 
-export async function doWork(task: TasksRow, workerConfig: WorkerConfig) {
-  const subtask = getNextSubtask(task.id);
-
+export async function doWork(
+  task: TasksRow,
+  subtask: SubtasksRow,
+  workerConfig: WorkerConfig,
+) {
   if (!subtask) {
     logger.info("No subtask found, returning");
     return;
@@ -82,6 +96,33 @@ export async function doWork(task: TasksRow, workerConfig: WorkerConfig) {
   });
 }
 
+async function summarize(task: TasksRow) {
+  const agent = new ToolLoopAgent({
+    model: mainModel,
+    tools: { updateTask: updateTaskTool },
+    instructions: summarizerSystemPrompt,
+  });
+
+  const subtasks = getSubtasks(task.id);
+  const subtasksTemplate = subtasks
+    .map((it) => `Title: ${it.title}. Notes: ${it.notes}\n`)
+    .join("");
+
+  return await agent.generate({
+    prompt: `Summarize task with id ${task.id} and prompt ${task.prompt}. Subtasks: ${subtasksTemplate}`,
+  });
+}
+
+export async function workOnPlan(
+  prompts: string[],
+  workerConfig: WorkerConfig,
+) {
+  for (const prompt of prompts) {
+    const task = await workOnTask(prompt, workerConfig);
+    await summarize(task);
+  }
+}
+
 export async function workOnTask(
   taskPrompt: string,
   workerConfig: WorkerConfig,
@@ -91,14 +132,16 @@ export async function workOnTask(
   //
   let task = await createTaskWithSubs(taskPrompt);
 
-  const subtask = getNextSubtask(task.id);
+  let subtask = getNextSubtask(task.id);
 
   while (subtask) {
+    logger.info(subtask);
     try {
-      await doWork(task, workerConfig);
+      await doWork(task, subtask, workerConfig);
     } catch (e) {
       logger.error(e);
     }
+    subtask = getNextSubtask(task.id);
     loopCount++;
   }
 

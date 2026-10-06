@@ -1,6 +1,6 @@
 import { getTree } from "../shared/scout/functions";
 import type { MainStateType } from ".";
-import { managerWorkerLoop, type WorkerConfig } from "../todos/agents";
+import { workOnTask, type WorkerConfig } from "../todos/agents";
 import {
   grepRecursive,
   ls,
@@ -24,7 +24,7 @@ export async function plan(state: MainStateType) {
     prompt: `Tree of your working directory is: ${tree}. Your work is to report and analyse HTML files. Avoid reading the files fully, prefer simplifyHtml and searchHtml. Report goes into the "notes" of the subtask`,
   };
 
-  await managerWorkerLoop(
+  await workOnTask(
     `You are studying the website at ${state.originDir}. Have your workers research its structure and content. The directory tree looks like this: ${tree}. Your workers have a very limited memory. Keep their subtasks small.`,
     workerConfig,
   );

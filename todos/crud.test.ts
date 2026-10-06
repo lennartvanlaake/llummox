@@ -9,13 +9,13 @@ describe("crud tasks", () => {
     db = setupDatabase(":memory:");
 
     const created = await crud.createTask({
-      title: "T1",
+      prompt: "T1",
       description: "d",
     });
-    expect(created.id).toBeGreaterThan(0);
+    expect(created.id).toBeTruthy();
 
     const fetched = crud.getTask(created.id);
-    expect(fetched?.title).toBe("T1");
+    expect(fetched?.prompt).toBe("T1");
 
     const all = await crud.listTasks();
     expect(all.map((t) => t.id)).toContain(created.id);
@@ -33,7 +33,7 @@ describe("crud subtasks", () => {
   it("create -> list -> update -> delete", async () => {
     db = setupDatabase(":memory:");
     const task = await crud.createTask({
-      title: "T",
+      prompt: "T",
       description: "d",
     });
 
@@ -42,7 +42,7 @@ describe("crud subtasks", () => {
       description: "d",
       taskId: task.id,
     });
-    expect(st.id).toBeGreaterThan(0);
+    expect(st.id).toBeTruthy();
 
     const all = await crud.listSubtasks(task.id);
     expect(all.map((s) => s.id)).toContain(st.id);

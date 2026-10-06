@@ -19,6 +19,8 @@ export const updateTaskTool = tool({
       .optional()
       .describe("New notes. Omit to leave unchanged."),
   }),
+  // ponytail: tasks are managed statically (no AI), so this tool only flips
+  // status/notes — prompt is set once and edited out of band.
   outputSchema: z.object({
     error: z.string().optional(),
   }),

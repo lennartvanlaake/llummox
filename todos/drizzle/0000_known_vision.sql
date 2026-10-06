@@ -1,8 +1,7 @@
 CREATE TABLE `tasks` (
 	`id` text NOT NULL,
 	`status` text,
-	`title` text NOT NULL,
-	`description` text NOT NULL,
+	`prompt` text NOT NULL,
 	`notes` text,
 	`createdAt` integer DEFAULT CURRENT_TIMESTAMP NOT NULL,
 	PRIMARY KEY (`id`)

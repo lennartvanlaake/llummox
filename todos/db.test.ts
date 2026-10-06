@@ -12,7 +12,7 @@ describe("setupDatabase", () => {
 
     await db
       .insert(tasksTable)
-      .values({ id: taskId, title: "Task A", description: "d" });
+      .values({ id: taskId, prompt: "Task A", description: "d" });
     await db.insert(subtasksTable).values({
       id: subTaskId,
       title: "Sub A",
