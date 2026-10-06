@@ -1,0 +1,31 @@
+---
+# NOTE: This file is auto-generated from 'scripts/error-docgen.mjs'
+# Do not make edits to it directly, they will be overwritten.
+# Instead, change this file: https://github.com/withastro/astro/blob/main/packages/astro/src/core/errors/errors-data.ts
+# Translators, please remove this note and the <DontEditWarning/> component.
+
+title: Astro.redirect is not available in static mode.
+i18nReady: true
+githubURL: https://github.com/withastro/astro/blob/main/packages/astro/src/core/errors/errors-data.ts
+---
+import DontEditWarning from '~/components/DontEditWarning.astro'
+
+<DontEditWarning />
+
+
+:::caution[Deprecated]
+Deprecated since version 2.6.
+:::
+
+> **StaticRedirectNotAvailable**: Redirects are only available when using `output: 'server'` or `output: 'hybrid'`. Update your Astro config if you need SSR features.
+
+## What went wrong?
+The `Astro.redirect` function is only available when  is enabled.
+
+To redirect on a static website, the  can be used. Certain hosts also provide config-based redirects (ex: ).
+
+**See Also:**
+-  
+-  
+
+

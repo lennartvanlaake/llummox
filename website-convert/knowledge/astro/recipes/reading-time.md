@@ -1,0 +1,196 @@
+---
+title: Add reading time
+description: Build a Markdown processor plugin to add reading time to your Markdown or MDX files.
+i18nReady: true
+type: recipe
+---
+
+
+
+Create a  which adds a reading time property to the frontmatter of your Markdown or MDX files. Use this property to display the reading time for each page.
+
+## Recipe
+
+<Steps>
+1. Install the following packages depending on the  used:
+
+    <MarkdownProcessorTabs>
+      <Fragment slot="satteri">
+        -  to calculate minutes read
+        -  to configure 
+        -  to create a 
+
+        <PackageManagerTabs>
+          <Fragment slot="npm">
+          ```shell
+          npm install reading-time @astrojs/markdown-satteri satteri
+          ```
+          </Fragment>
+          <Fragment slot="pnpm">
+          ```shell
+          pnpm add reading-time @astrojs/markdown-satteri satteri
+          ```
+          </Fragment>
+          <Fragment slot="yarn">
+          ```shell
+          yarn add reading-time @astrojs/markdown-satteri satteri
+          ```
+          </Fragment>
+        </PackageManagerTabs>
+      </Fragment>
+      <Fragment slot="unified">
+        -  to calculate minutes read
+        -  to extract all text from your markdown
+        -  to use 
+
+        <PackageManagerTabs>
+          <Fragment slot="npm">
+          ```shell
+          npm install reading-time mdast-util-to-string @astrojs/markdown-remark
+          ```
+          </Fragment>
+          <Fragment slot="pnpm">
+          ```shell
+          pnpm add reading-time mdast-util-to-string @astrojs/markdown-remark
+          ```
+          </Fragment>
+          <Fragment slot="yarn">
+          ```shell
+          yarn add reading-time mdast-util-to-string @astrojs/markdown-remark
+          ```
+          </Fragment>
+        </PackageManagerTabs>
+      </Fragment>
+    </MarkdownProcessorTabs>
+
+2. Create a mdast plugin.
+
+    This plugin retrieves the Markdown file's text. This text is then passed to the `reading-time` package to calculate the reading time in minutes.
+
+    <MarkdownProcessorTabs>
+      <Fragment slot="satteri">
+        ```js title="src/mdast/mdast-reading-time.ts"
+        import getReadingTime from "reading-time";
+        import { defineMdastPlugin } from "satteri";
+
+        export const mdastReadingTimePlugin = defineMdastPlugin({
+          name: "mdast-reading-time",
+          after(root, context) {
+            const textOnPage = context.textContent(root);
+            const readingTime = getReadingTime(textOnPage);
+
+            if (context.data.astro !== undefined) {
+              // readingTime.text will give us minutes read as a friendly string,
+              // i.e. "3 min read"
+              context.data.astro.frontmatter.minutesRead = readingTime.text;
+            }
+          },
+        });
+        ```
+      </Fragment>
+      <Fragment slot="unified">
+        ```js title="remark-reading-time.mjs"
+        import getReadingTime from "reading-time";
+        import { toString } from "mdast-util-to-string";
+
+        export function remarkReadingTime() {
+          return function (tree, { data }) {
+            const textOnPage = toString(tree);
+            const readingTime = getReadingTime(textOnPage);
+            // readingTime.text will give us minutes read as a friendly string,
+            // i.e. "3 min read"
+            data.astro.frontmatter.minutesRead = readingTime.text;
+          };
+        }
+        ```
+      </Fragment>
+    </MarkdownProcessorTabs>
+
+3. Add the plugin to your config:
+
+    <MarkdownProcessorTabs>
+      <Fragment slot="satteri">
+        ```js title="astro.config.mjs" {1,3,7-9}
+        import { satteri } from "@astrojs/markdown-satteri";
+        import { defineConfig } from "astro/config";
+        import { mdastReadingTimePlugin } from "./src/mdast/mdast-reading-time";
+
+        export default defineConfig({
+          markdown: {
+            processor: satteri({
+              mdastPlugins: [mdastReadingTimePlugin],
+            }),
+          },
+        });
+        ```
+      </Fragment>
+      <Fragment slot="unified">
+        ```js title="astro.config.mjs" {1,3,7-9}
+        import { unified } from "@astrojs/markdown-remark";
+        import { defineConfig } from "astro/config";
+        import { remarkReadingTime } from "./remark-reading-time.mjs";
+
+        export default defineConfig({
+          markdown: {
+            processor: unified({
+              remarkPlugins: [remarkReadingTime],
+            }),
+          },
+        });
+        ```
+      </Fragment>
+    </MarkdownProcessorTabs>
+
+    Now all Markdown documents will have a calculated `minutesRead` property in their frontmatter.
+
+4. Display Reading Time
+
+    If your blog posts are stored in a , access . Then, render `minutesRead` in your template wherever you would like it to appear.
+
+    ```astro title="src/pages/posts/[slug].astro" "const { Content, remarkPluginFrontmatter } = await render(entry);" "<p>{remarkPluginFrontmatter.minutesRead}</p>"
+    ---
+    import { getCollection, render } from "astro:content";
+
+    export async function getStaticPaths() {
+      const blog = await getCollection("blog");
+      return blog.map((entry) => ({
+        params: { slug: entry.id },
+        props: { entry },
+      }));
+    }
+
+    const { entry } = Astro.props;
+    const { Content, remarkPluginFrontmatter } = await render(entry);
+    ---
+
+    <html>
+      <head>
+        <meta charset="utf-8" />
+        <title>{entry.data.title}</title>
+      </head>
+      <body>
+        <title>{entry.data.title}</title>
+        <p>{remarkPluginFrontmatter.minutesRead}</p>
+        <Content />
+      </body>
+    </html>
+    ```
+
+    If you're using a , use the `minutesRead` frontmatter property from `Astro.props` in your layout template.
+
+    ```astro title="src/layouts/BlogLayout.astro" "const { minutesRead } = Astro.props.frontmatter;" "<p>{minutesRead}</p>"
+    ---
+    const { minutesRead } = Astro.props.frontmatter;
+    ---
+
+    <html>
+      <head>
+        <meta charset="utf-8" />
+      </head>
+      <body>
+        <p>{minutesRead}</p>
+        <slot />
+      </body>
+    </html>
+    ```
+</Steps>

@@ -1,0 +1,76 @@
+---
+title: Deploy your Astro Site with Railway
+description: How to deploy your Astro site using the Railway web interface.
+sidebar:
+  label: Railway
+type: deploy
+i18nReady: true
+logo: railway
+supports: ['ssr', 'static']
+stub: true
+---
+
+
+ is a deployment platform built to simplify your infrastructure stack from servers to observability with a unified developer experience.
+
+This guide is for deploying an Astro static site to Railway using either the web interface or Railway CLI tool.
+
+:::tip
+To deploy an Astro site with on-demand rendering (SSR) using the Node adapter, you can follow .
+:::
+
+## Project Configuration
+
+Railway's default build system, , automatically builds your Astro project as a static site.
+
+## Deploy via a Railway template
+
+If you do not already have an Astro project, and are starting from scratch:
+
+<Steps>
+  1. Go to the Astro template on Railway: .
+
+  2. Click "Deploy Now" and sign in with your GitHub account to authorize Railway. This will deploy the Astro template into your new Railway account.
+
+  3. Eject the service code into your own Github repository by following . This will allow you to keep the repo deployed but customize it with your own code.
+</Steps>
+
+## Deploy via the web interface
+
+If you have an existing Astro project you would like to deploy but not a Railway account yet:
+
+<Steps>
+  1. Create a  and sign in.
+
+  2. From the Railway dashboard, create a new .
+  
+  3. Select the option to deploy from a GitHub repository, and select your Astro project.
+  
+  4. Generate or add a custom domain from your project's .
+</Steps>
+
+## Deploy via Railway CLI
+
+If you have an existing Astro project you would like to deploy and an existing Railway account:
+
+<Steps>
+  1.  the Railway CLI tool.
+
+  2. Login with the command `railway login`.
+  
+  3. From within your Astro project, run `railway init` and choose a workspace and project name.
+  
+  4. Run `railway up` to deploy your project on Railway.
+  
+  5. Run `railway domain` to generate a Railway provided service domain.
+</Steps>
+
+
+## Official Resources 
+
+- 
+- 
+
+## Community Resources 
+
+

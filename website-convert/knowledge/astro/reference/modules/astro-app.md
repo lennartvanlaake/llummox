@@ -1,0 +1,420 @@
+---
+title: Adapter Server Entrypoint API Reference
+sidebar:
+  label: 'astro/app'
+i18nReady: true
+tableOfContents:
+  minHeadingLevel: 2
+  maxHeadingLevel: 3
+---
+
+
+This module helps adapter authors  while supporting pages rendered in development mode or that have been prebuilt through `astro build`. 
+
+`astro/app` is used internally for , and is also publicly available for you to build a custom adapter for your specific runtime or deploy host.
+
+:::tip[Publishing your adapter]
+Use the appropriate keywords when you  so that your adapter will be listed in our .
+:::
+
+Astro uses the standard  and  objects. Hosts using a different API for requests/responses should convert to these types in their adapter. For example, Astro exposes .
+
+## Imports from `astro/app/entrypoint`
+
+The following helpers are imported from the `entrypoint` directory in the app module:
+
+```js
+
+```
+
+### `createApp()`
+
+<p>
+
+**Type:** <code>(options?: \{ streaming: boolean \}) => <a href="#the-app-instance">App</a></code><br />
+<Since v="6.0.0" />
+</p>
+
+Returns an  that includes methods to work with standard Request and Response objects when .
+
+```js
+
+const app = createApp();
+
+addEventListener("fetch", (event) => {
+  if (event instanceof FetchEvent) {
+    event.respondWith(app.render(event.request));
+  }
+});
+```
+
+#### Options
+
+The `createApp()` function accepts the following options.
+
+##### `options.streaming`
+
+<p>
+
+**Type:** `boolean`<br />
+**Default:** `true`
+</p>
+
+Defines whether HTML streaming is enabled. In most cases, disabling streaming is not recommended as it improves performance and generally provides a better visitor experience.
+
+HTML streaming breaks a document into chunks to send over the network and render on the page in order. This normally results in visitors seeing your HTML as fast as possible, but factors such as network conditions and waiting for data fetches can block page rendering.
+
+However, when you need to disable HTML streaming (e.g. your host only supports non-streamed HTML caching at the CDN level), you can opt out of the default behavior by passing `streaming: false` to `createApp()`:
+
+```ts
+
+const app = createApp();
+
+export const handle = async (request: Request) => {
+  const response = await app.render(request);
+  return response;
+};
+```
+
+##### `app.match()`
+
+<p>
+
+**Type:** <code>(request: Request, allowPrerenderedRoutes = false) => <a href="/en/reference/integrations-reference/#routedata">RouteData</a> | undefined</code>
+</p>
+
+Determines whether a request is matched by the Astro app's routing rules.
+
+```ts {6,11}
+
+const app = createApp();
+
+export const handle = async (request: Request) => {
+  if (app.match(request)) {
+    const response = await app.render(request);
+    return response;
+  } else {
+    return new Response("Not Found", { status: 404 });
+  }
+};
+```
+
+You can usually call `app.render(request)` without using `.match` because Astro handles 404s if you provide a `404.astro` file. Use `app.match(request)` if you want to handle 404s in a different way.
+
+By default, prerendered routes aren't returned, even if they are matched. You can change this behavior by using `true` as the second argument.
+
+##### `app.adapterLogger`
+
+<p>
+
+**Type:** <br />
+<Since v="v6.2.0" />
+</p>
+
+Returns an  available to the adapter's runtime environment.
+
+```ts {9}
+
+const app = createApp();
+
+export const handle = async () => {
+  try {
+    /* Some logic that can throw */
+  } catch {
+    app.adapterLogger.error("Your custom error message using Astro logger.");
+  }
+};
+```
+
+##### `app.getAllowedDomains()`
+
+<p>
+
+**Type:** <code>() => Partial\<<a href="/en/reference/modules/astro-assets/#remotepattern">RemotePattern</a>\>[] | undefined</code><br />
+<Since v="5.14.2" />
+</p>
+
+Returns a list of permitted host patterns for incoming requests when using on-demand rendering .
+
+##### `app.removeBase()`
+
+<p>
+
+**Type:** `(pathname: string) => string`<br />
+<Since v="1.6.4" />
+</p>
+
+Removes the base from the given path. This is useful when you need to look up assets from the filesystem.
+
+##### `app.setCookieHeaders()`
+
+<p>
+
+**Type:** `(response: Response) => Generator<string, string[], any>`<br />
+<Since v="1.4.0" />
+</p>
+
+Returns a generator that yields individual cookie header values from a `Response` object. This is used to properly handle multiple cookies that may have been set during request processing.
+
+The following example appends a `Set-Cookie` header for each header obtained from a response:
+
+```ts {7-9}
+
+const app = createApp();
+
+export const handle = async (request: Request) => {
+  const response = await app.render(request);
+  for (const setCookieHeader of app.setCookieHeaders(response)) {
+    response.headers.append("Set-Cookie", setCookieHeader);
+  }
+  return response;
+};
+```
+
+## Imports from `astro/app/node`
+
+The following helpers are imported from the `node` directory in the app module:
+
+```js
+
+```
+
+This module is used in conjunction with  to convert a  into a web-standard `Request` and stream a web-standard `Response` into a .
+
+### `createRequest()`
+
+<p>
+
+**Type:** <code>(req: NodeRequest, options?: \{ skipBody?: boolean; allowedDomains?: Partial\<<a href="/en/reference/modules/astro-assets/#remotepattern">RemotePattern</a>\>[]; \}) => Request</code><br />
+<Since v="6.0.0" />
+</p>
+
+Converts a NodeJS `IncomingMessage` into a standard `Request` object. An optional object can be passed as a second argument to further control how the request is created. This is useful if you want to ignore the body (defaults to `false`) or pass the configured  to the request.
+
+The following example creates a `Request` and passes it to :
+
+```js {2,8}
+
+
+
+const app = createApp();
+
+const server = createServer(async (req, res) => {
+  const request = createRequest(req);
+  const response = await app.render(request);
+});
+```
+
+### `writeResponse()`
+
+<p>
+
+**Type:** `(source: Response, destination: ServerResponse) => Promise<ServerResponse<IncomingMessage> | undefined>`<br />
+<Since v="6.0.0" />
+</p>
+
+Streams a web-standard `Response` into a NodeJS server response. This function takes a `Response` object and the initial `ServerResponse` before returning a promise of a `ServerResponse` object.
+
+The following example creates a `Request`, passes it to , and writes the response:
+
+```js {10} /(?<=\s)writeResponse(?=\s)/
+
+
+
+const app = createApp();
+
+const server = createServer(async (req, res) => {
+  const request = createRequest(req);
+  const response = await app.render(request);
+  await writeResponse(response, res);
+});
+```
+
+## `astro/app` types
+
+The following types are imported from the app module:
+
+```ts
+
+```
+
+### `RenderOptions`
+
+<p>
+
+**Type:** `{addCookieHeader?: boolean; clientAddress?: string; locals?: object; prerenderedErrorPageFetch?: (url: ErrorPagePath) => Promise<Response>; waitUntil?: (promise: Promise<unknown>) => void; routeData?: RouteData;}`
+</p>
+
+Describes the options for controlling the routes rendering.
+
+#### `RenderOptions.addCookieHeader`
+
+<p>
+
+**Type:** `boolean`<br />
+**Default:** `false`
+</p>
+
+Whether or not to automatically add all cookies written by  to the response headers.
+
+When set to `true`, they will be added to the `Set-Cookie` header of the response as comma-separated key-value pairs. You can use the standard `response.headers.getSetCookie()` API to read them individually.
+
+```ts {6}
+
+const app = createApp();
+
+export const handle = async (request: Request) => {
+  const response = await app.render(request, { addCookieHeader: true });
+  return response;
+};
+```
+
+#### `RenderOptions.clientAddress`
+
+<p>
+
+**Type:** `string`<br />
+**Default:** `request[Symbol.for("astro.clientAddress")]`
+</p>
+
+The client IP address that will be made available as  in pages, and as `ctx.clientAddress` in API routes and middleware.
+
+The example below reads the `x-forwarded-for` header and passes it as `clientAddress`. This value becomes available to the user as `Astro.clientAddress`.
+
+```ts "clientAddress"
+
+const app = createApp();
+
+export const handle = async (request: Request) => {
+  const clientAddress = request.headers.get("x-forwarded-for") ?? undefined;
+  const response = await app.render(request, { clientAddress });
+  return response;
+};
+```
+
+#### `RenderOptions.locals`
+
+<p>
+
+**Type:** `object`
+</p>
+
+The  used to store and access information during the lifecycle of a request.
+
+The example below reads a header named `x-private-header`, attempts to parse it as an object, and passes it to `locals`, which can then be passed to any .
+
+```ts "locals"
+
+const app = createApp();
+
+export const handle = async (request: Request) => {
+  const privateHeader = request.headers.get("x-private-header");
+  let locals = {};
+  try {
+    if (privateHeader) {
+      locals = JSON.parse(privateHeader);
+    }
+  } finally {
+    const response = await app.render(request, { locals });
+    return response;
+  }
+};
+```
+
+#### `RenderOptions.prerenderedErrorPageFetch()`
+
+<p>
+
+**Type:** `(url: ErrorPagePath) => Promise<Response>`<br />
+**Default:** `fetch`<br />
+<Since v="5.6.0" />
+</p>
+
+A function that allows you to provide custom implementations for fetching prerendered error pages.
+
+This is used to override the default `fetch()` behavior, for example, when `fetch()` is unavailable or when you cannot call the server from itself.
+
+The following example reads `500.html` and `404.html` from disk instead of performing an HTTP call:
+
+```ts "prerenderedErrorPageFetch"
+
+
+const app = createApp();
+
+export const handle = async (request: Request) => {
+  return app.render(request, {
+    prerenderedErrorPageFetch: async (url: string): Promise<Response> => {
+      if (url.includes("/500")) {
+        const content = await fs.promises.readFile("500.html", "utf-8");
+        return new Response(content, {
+          status: 500,
+          headers: { "Content-Type": "text/html" },
+        });
+      }
+
+      const content = await fs.promises.readFile("404.html", "utf-8");
+      return new Response(content, {
+        status: 404,
+        headers: { "Content-Type": "text/html" },
+      });
+    },
+  });
+};
+```
+
+If not provided, Astro will fallback to its default behavior for fetching error pages.
+
+#### `RenderOptions.waitUntil()`
+
+<p>
+
+**Type:** `(promise: Promise<unknown>) => void`<br />
+<Since v="6.2.0" />
+</p>
+
+An optional runtime hook for background work after the response is sent.
+
+Adapters can pass this through to let runtime cache providers schedule work such as cache writes or stale-while-revalidate without blocking the response path.
+
+The following example forwards a runtime's `waitUntil()` implementation to  in an :
+
+```ts {12}
+
+// Context is provided by the runtime. This is a minimal example of what it can look like.
+type Context = {
+  waitUntil(promise: Promise<any>): void;
+};
+
+const app = createApp();
+
+export async function handler(request: Request, context: Context) {
+  return app.render(request, {
+    waitUntil: context.waitUntil.bind(context),
+  });
+}
+```
+
+#### `RenderOptions.routeData`
+
+<p>
+
+**Type:** <br />
+**Default:** `app.match(request)`
+</p>
+
+Defines the information about a route. This is useful when you already know the route to render. Doing so will bypass the internal call to  to determine the route to render.
+
+```ts "routeData"
+
+const app = createApp();
+
+export async function handler(request: Request) {
+  const routeData = app.match(request);
+  if (routeData) {
+    return app.render(request, { routeData });
+  } else {
+    /* adapter-specific 404 response */
+    return new Response("Not Found", { status: 404 });
+  }
+}
+```

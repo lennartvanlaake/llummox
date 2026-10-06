@@ -1,0 +1,136 @@
+---
+title: Add icons to external links
+description: Learn how to use a Markdown processor plugin to add icons to external links in your Markdown files.
+i18nReady: true
+type: recipe
+---
+
+
+
+Using a , you can identify and modify links in your Markdown files that point to external sites. This example adds an icon to the end of each external link, so that visitors will know they are leaving your site.
+
+## Prerequisites
+
+- An Astro project using Markdown for content pages.
+
+## Recipe
+
+<MarkdownProcessorTabs>
+  <Fragment slot="satteri">
+    <Steps>
+    1. Install both  and :
+
+        <PackageManagerTabs>
+            <Fragment slot="npm">
+            ```shell
+            npm install @astrojs/markdown-satteri satteri
+            ```
+            </Fragment>
+            <Fragment slot="pnpm">
+            ```shell
+            pnpm add @astrojs/markdown-satteri satteri
+            ```
+            </Fragment>
+            <Fragment slot="yarn">
+            ```shell
+            yarn add @astrojs/markdown-satteri satteri
+            ```
+            </Fragment>
+          </PackageManagerTabs>
+
+    2. Create a  that adds an icon if the link starts with `http`:
+
+        ```ts title="src/hast/hast-external-links.ts"
+        import { defineHastPlugin } from 'satteri';
+
+        export const hastExternalLinks = defineHastPlugin({
+          name: "hast-external-links",
+          element: {
+            filter: ["a"],
+            visit(node, context) {
+              if (node.properties.href?.startsWith("http")) {
+                context.appendChild(node, {
+                  type: "element",
+                  tagName: "span",
+                  properties: { ariaHidden: "true" },
+                  children: [
+                    {
+                      type: "text",
+                      value: "🔗",
+                    },
+                  ],
+                });
+              }
+            },
+          },
+        });
+        ```
+
+    3. Configure the plugin in your `astro.config.mjs` file.
+
+        Import `satteri()` and  to add custom Sätteri plugins. Then, pass to `hastPlugins` an array containing your imported `hastExternalLinks` plugin.
+
+        ```js title="astro.config.mjs"
+        import { satteri } from '@astrojs/markdown-satteri';
+        import { defineConfig } from 'astro/config';
+        import { hastExternalLinks } from './src/hast/hast-external-links';
+
+        export default defineConfig({
+          markdown: {
+            processor: satteri({
+              hastPlugins: [hastExternalLinks],
+            }),
+          },
+        });
+        ```
+    </Steps>
+  </Fragment>
+  <Fragment slot="unified">
+    <Steps>
+    1. Install both the  plugin and .
+
+        <PackageManagerTabs>
+            <Fragment slot="npm">
+            ```shell
+            npm install rehype-external-links @astrojs/markdown-remark
+            ```
+            </Fragment>
+            <Fragment slot="pnpm">
+            ```shell
+            pnpm add rehype-external-links @astrojs/markdown-remark
+            ```
+            </Fragment>
+            <Fragment slot="yarn">
+            ```shell
+            yarn add rehype-external-links @astrojs/markdown-remark
+            ```
+            </Fragment>
+          </PackageManagerTabs>
+
+    2. Configure the plugin in your `astro.config.mjs` file.
+
+        Import `unified()` and  to support remark plugins. Then, pass to `rehypePlugins` an array containing your imported `rehypeExternalLinks` plugin and an options object with a `content` property. Set this property's `type` to `text` if you want to add plain text to the end of the link. To add HTML to the end of the link instead, set the property `type` to	`raw`.
+
+        ```js title="astro.config.mjs"
+        import { unified } from '@astrojs/markdown-remark';
+        import { defineConfig } from 'astro/config';
+        import rehypeExternalLinks from 'rehype-external-links';
+
+        export default defineConfig({
+          markdown: {
+            processor: unified({
+              rehypePlugins: [
+                [
+                  rehypeExternalLinks,
+                  {
+                    content: { type: 'text', value: ' 🔗' }
+                  }
+                ],
+              ]
+            }),
+          },
+        });
+        ```
+    </Steps>
+  </Fragment>
+</MarkdownProcessorTabs>

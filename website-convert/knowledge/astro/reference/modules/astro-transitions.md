@@ -1,0 +1,578 @@
+---
+title: View Transitions Router API Reference
+sidebar:
+  label: 'astro:transitions'
+i18nReady: true
+tableOfContents:
+  minHeadingLevel: 2
+  maxHeadingLevel: 6
+---
+
+
+<p><Since v="3.0.0" /></p>
+
+These modules provide functions to control and interact with the View Transitions API and client-side router.
+
+:::note
+This API is compatible with the `<ClientRouter />` included in `astro:transitions`, but can't be used with native browser MPA routing.
+:::
+
+For features and usage examples, .
+
+## Imports from `astro:transitions`
+
+```ts
+
+```
+
+### `<ClientRouter />`
+
+<p><Since v="5.0.0" /></p>
+
+Opt in to using view transitions on individual pages by importing and adding the `<ClientRouter />` routing component to `<head>` on every desired page.
+
+```astro title="src/pages/index.astro" ins={2,7}
+---
+
+---
+<html lang="en">
+  <head>
+    <title>My Homepage</title>
+    <ClientRouter />
+  </head>
+  <body>
+    <h1>Welcome to my website!</h1>
+  </body>
+</html>
+```
+
+See more about how to  and  to page elements and components.
+
+The `<ClientRouter />` component accepts the following props:
+
+<h4>`fallback`</h4>
+
+<p>
+
+**Type:** <br />
+**Default:** `animate`
+</p>
+
+Defines the fallback strategy to use for browsers that do not support the .
+
+### `fade`
+
+<p>
+
+**Type:** `(opts: { duration?: string | number }) => TransitionDirectionalAnimations`
+<Since v="3.0.0" />
+</p>
+
+Utility function to support customizing the duration of the built-in `fade` animation.
+
+```astro {2} /fade\\(.+\\)/
+---
+
+---
+
+<!-- Fade transition with the default duration -->
+<div transition:animate="fade" />
+
+<!-- Fade transition with a duration of 400 milliseconds -->
+<div transition:animate={fade({ duration: '0.4s' })} />
+```
+
+### `slide`
+
+<p>
+
+**Type:** `(opts: { duration?: string | number }) => TransitionDirectionalAnimations`
+<Since v="3.0.0" />
+</p>
+
+Utility function to support customizing the duration of the built-in `slide` animation.
+
+```astro {2} /slide\\(.+\\)/
+---
+
+---
+
+<!-- Slide transition with the default duration -->
+<div transition:animate="slide" />
+
+<!-- Slide transition with a duration of 400 milliseconds -->
+<div transition:animate={slide({ duration: '0.4s' })} />
+```
+
+## Imports from `astro:transitions/client`
+
+```ts
+
+```
+
+### `navigate()`
+
+<p>
+
+**Type:** `(href: string, options?: Options) => void`<br />
+<Since v="3.2.0" />
+</p>
+
+Executes a navigation to the given `href` using the View Transitions API.
+
+This function signature is based on the . Although based on the Navigation API, this function is implemented on top of the  to allow for navigation without reloading the page.
+
+`navigate()` does not perform sanitization on the `href` parameter.  if you use it to determine the URL to navigate to.
+
+#### `history` option
+
+<p>
+
+**Type:** `'auto' | 'push' | 'replace'`<br />
+**Default:** `'auto'`<br />
+<Since v="3.2.0" />
+</p>
+
+Defines how this navigation should be added to the browser history.
+
+- `'push'`: the router will use `history.pushState` to create a new entry in the browser history.
+- `'replace'`: the router will use `history.replaceState` to update the URL without adding a new entry into navigation.
+- `'auto'` (default): the router will attempt `history.pushState`, but if the URL cannot be transitioned to, the current URL will remain with no changes to the browser history.
+
+This option follows the  from the browser Navigation API but simplified for the cases that can happen on an Astro project.
+
+#### `formData` option
+
+<p>
+
+**Type:** `FormData`<br />
+<Since v="3.5.0" />
+</p>
+
+A `FormData` object for `POST` requests.
+
+When this option is provided, the requests to the navigation target page will be sent as a `POST` request with the form data object as the content.
+
+Submitting an HTML form with view transitions enabled will use this method instead of the default navigation with page reload. Calling this method allows triggering the same behavior programmatically.
+
+#### `info` option
+
+<p>
+
+**Type:** `any`<br />
+<Since v="3.6.0" />
+</p>
+
+Arbitrary data to be included in the `astro:before-preparation` and `astro:before-swap` events caused by this navigation.
+
+This option mimics the  from the browser Navigation API.
+
+#### `state` option
+
+<p>
+
+**Type:** `any`<br />
+<Since v="3.6.0" />
+</p>
+
+Arbitrary data to be associated with the `NavigationHistoryEntry` object created by this navigation. This data can then be retrieved using the  from the History API.
+
+This option mimics the  from the browser Navigation API.
+
+#### `sourceElement` option
+
+<p>
+
+**Type:** `Element`<br />
+<Since v="3.6.0" />
+</p>
+
+The element that triggered this navigation, if any. This element will be available in the following events:
+- 
+- 
+
+### `supportsViewTransitions`
+
+<p>
+
+**Type:** `boolean`<br />
+<Since v="3.2.0" />
+</p>
+
+Whether or not view transitions are supported and enabled in the current browser.
+
+### `transitionEnabledOnThisPage()`
+
+<p>
+
+**Type:** `() => boolean`<br />
+<Since v="3.2.0" />
+</p>
+
+Whether or not the current page has view transitions enabled for client-side navigation. This can be used to make components that behave differently when they are used on pages with view transitions.
+
+### `swapFunctions`
+
+<p>
+
+**Type:** `object`<br />
+<Since v="4.15.0" />
+</p>
+
+An object containing the utility functions used to build Astro’s default swap function.
+These can be useful when .
+
+`swapFunctions` provides the following methods:
+
+#### `deselectScripts()`
+
+<p>
+
+**Type:** `(newDocument: Document) => void`
+</p>
+
+Marks scripts in the new document that should not be executed. Those scripts are already in the current document and are not flagged for re-execution using .
+
+#### `swapRootAttributes()`
+
+<p>
+
+**Type:** `(newDocument: Document) => void`
+</p>
+
+Swaps the attributes between the document roots, like the `lang` attribute. This also includes Astro-injected internal attributes like `data-astro-transition`, which makes the transition direction available to Astro-generated CSS rules.
+
+When making a custom swap function, it is important to call this function so as not to break the view transition's animations.
+
+#### `swapHeadElements()`
+
+<p>
+
+**Type:** `(newDocument: Document) => void`
+</p>
+
+Removes every element from the current document's `<head>` that is not persisted to the new document. Then appends all new elements from the new document's `<head>` to the current document's `<head>`.
+
+#### `saveFocus()`
+
+<p>
+
+**Type:** `() => () => void`
+</p>
+
+Stores the element in focus on the current page and returns a function that when called, if the focused element was persisted, returns the focus to it.
+
+
+#### `swapBodyElement()`
+
+<p>
+
+**Type:** `(newBody: Element, oldBody: Element) => void`
+</p>
+
+Replaces the old body with the new body. Then, goes through every element in the old body that should be persisted and have a matching element in the new body and swaps the old element back in place.
+
+## `astro:transitions/client` types
+
+```ts
+
+```
+
+### `Direction`
+
+<p>
+
+**Type:** `'forward' | 'back'`<br />
+<Since v="3.2.0" />
+</p>
+
+A union of animation directions:
+- `forward`: navigating to the next page in the history or to a new page.
+- `back`: navigating to the previous page in the history.
+
+### `Fallback`
+
+<p>
+
+**Type:** `'none' | 'animate' | 'swap'`<br />
+<Since v="3.2.0" />
+</p>
+
+A union of fallback strategies to use in browsers that do not support view transitions:
+- `animate`: Astro will simulate view transitions using custom attributes before updating page content.
+- `swap`: Astro will not attempt to animate the page. Instead, the old page will be immediately replaced by the new one.
+- `none`: Astro will not do any animated page transitions at all. Instead, you will get full page navigation in non-supporting browsers.
+
+<ReadMore>Learn more about  with the `ClientRouter`.</ReadMore>
+
+### `NavigationTypeString`
+
+<p>
+
+**Type:** `'push' | 'replace' | 'traverse'`<br />
+<Since v="3.6.0" />
+</p>
+
+A union of supported history navigation events.
+
+### `TransitionBeforePreparationEvent`
+
+<p>
+
+**Type:** `Event`<br />
+<Since v="3.6.0" />
+</p>
+
+Represents an . This can be useful to type the event received by a listener:
+
+```astro title="src/pages/index.astro" "TransitionBeforePreparationEvent"
+---
+---
+
+<script>
+  import type { TransitionBeforePreparationEvent } from "astro:transitions/client";
+
+  function listener(event: TransitionBeforePreparationEvent) {
+    /* do something */
+  }
+
+  document.addEventListener("astro:before-preparation", listener);
+</script>
+```
+
+### `TransitionBeforeSwapEvent`
+
+<p>
+
+**Type:** `Event`<br />
+<Since v="3.6.0" />
+</p>
+
+Represents an . This can be useful to type the event received by a listener:
+
+```astro title="src/pages/index.astro" "TransitionBeforeSwapEvent"
+---
+---
+
+<script>
+  import type { TransitionBeforeSwapEvent } from "astro:transitions/client";
+
+  function listener(event: TransitionBeforeSwapEvent) {
+    /* do something */
+  }
+
+  document.addEventListener("astro:before-swap", listener);
+</script>
+```
+
+## Lifecycle events
+
+### `astro:before-preparation` event
+
+<p>
+
+**Type:** <br />
+<Since v="3.6.0" />
+</p>
+
+An event dispatched at the beginning of a navigation using the View Transitions router. This event happens before any request is made and any browser state is changed.
+
+This event has the attributes:
+- 
+- 
+- 
+- 
+- 
+- 
+- 
+- 
+
+<ReadMore>Read more about how to use this event on the .</ReadMore>
+
+### `astro:after-preparation` event
+
+<p>
+
+**Type:** `Event`<br />
+<Since v="3.6.0" />
+</p>
+
+An event dispatched after the next page in a navigation using View Transitions router is loaded.
+
+This event has no attributes.
+
+<ReadMore>Read more about how to use this event on the .</ReadMore>
+
+### `astro:before-swap` event
+
+<p>
+
+**Type:** <br />
+<Since v="3.6.0" />
+</p>
+
+An event dispatched after the next page is parsed, prepared, and linked into a document in preparation for the transition but before any content is swapped between the documents.
+
+This event can't be canceled. Calling `preventDefault()` is a no-op.
+
+This event has the attributes:
+- 
+- 
+- 
+- 
+- 
+- 
+- 
+- 
+
+<ReadMore>Read more about how to use this event on the .</ReadMore>
+
+### `astro:after-swap` event
+
+<p>
+
+**Type:** `Event`
+</p>
+
+An event dispatched after the contents of the page have been swapped but before the view transition ends.
+
+The history entry and scroll position have already been updated when this event is triggered.
+
+### `astro:page-load` event
+
+<p>
+
+**Type:** `Event`
+</p>
+
+An event dispatched after a page completes loading, whether from a navigation using view transitions or native to the browser.
+
+When view transitions is enabled on the page, code that would normally execute on `DOMContentLoaded` should be changed to execute on this event.
+
+### Lifecycle events attributes
+
+<p><Since v="3.6.0" /></p>
+
+The following attributes are common to both the  and  events, except for some that are only available with one or the other.
+
+#### `info`
+
+<p>
+
+**Type:** `any`
+</p>
+
+Arbitrary data defined during navigation.
+
+This is the literal value passed on the  of the .
+
+#### `sourceElement`
+
+<p>
+
+**Type:** `Element | undefined`
+</p>
+
+The element that triggered the navigation. This can be, for example, an `<a>` element that was clicked.
+
+When using the , this will be the element specified in the call.
+
+#### `newDocument`
+
+<p>
+
+**Type:** `Document`
+</p>
+
+The document for the next page in the navigation. The contents of this document will be swapped in place of the contents of the current document.
+
+#### `navigationType`
+
+<p>
+
+**Type:** 
+</p>
+
+Which kind of history navigation is happening.
+- `push`: a new `NavigationHistoryEntry` is being created for the new page.
+- `replace`: the current `NavigationHistoryEntry` is being replaced with an entry for the new page.
+- `traverse`: no `NavigationHistoryEntry` is created. The position in the history is changing. The direction of the traversal is given on the .
+
+#### `direction`
+
+<p>
+
+**Type:** `string`
+</p>
+
+The direction of the transition:
+* In an , this can be used to define custom directions. The property is writable and accepts any string.
+* In an , this can be used to retrieve the transition direction. The property is readonly and its value can be a predefined  or any string that an `astro:before-preparation` event listener might have set.
+
+#### `from`
+
+<p>
+
+**Type:** `URL`
+</p>
+
+The URL of the page initiating the navigation.
+
+#### `to`
+
+<p>
+
+**Type:** `URL`
+</p>
+
+The URL of the page being navigated to. This property can be modified, the value at the end of the lifecycle will be used in the `NavigationHistoryEntry` for the next page.
+
+#### `formData`
+
+<p>
+
+**Type:** `FormData | undefined`<br />
+**Available in:** 
+</p>
+
+When set, a `POST` request will be sent to the  with the given `FormData` object as the content instead of the normal `GET` request.
+
+When submitting an HTML form with view transitions enabled, this field is automatically set to the data in the form. When using the , this value is the same as given in the options.
+
+#### `loader()`
+
+<p>
+
+**Type:** `() => Promise<void>`<br />
+**Available in:** 
+</p>
+
+Implementation of the following phase in the navigation (loading the next page). This implementation can be overridden to add extra behavior.
+
+#### `viewTransition`
+
+<p>
+
+**Type:** <br />
+**Available in:** 
+</p>
+
+The view transition object used in this navigation. On browsers that do not support the , this is an object implementing the same API for convenience but without the DOM integration.
+
+#### `swap()`
+
+<p>
+
+**Type:** `() => void`<br />
+**Available in:** 
+</p>
+
+Calls the default document swap logic. By default, this implementation will call the following functions in order:
+
+1. 
+2. 
+3. 
+4. 
+5. 
+
+<ReadMore>Read more about  in the View Transitions guide.</ReadMore>

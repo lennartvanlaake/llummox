@@ -3,6 +3,7 @@ import { EMBEDDING_DIMENSIONS } from "./constants";
 import { pipeline } from "@huggingface/transformers";
 
 import { RecursiveCharacterTextSplitter } from "@langchain/textsplitters";
+import { hash } from "bun";
 
 let transformerEmbedder: any;
 
@@ -70,12 +71,13 @@ export async function embed(text: string): Promise<number[]> {
   return row;
 }
 
-export async function embedDocument(source: string, content: string) {
-  // new schema: docs holds path/hash/type/theme; chunks reference the parent's
-  // numeric id, so create the docs row first to obtain it.
-  // ponytail: insertDoc takes the doc id and stores the seeded demo path
-  // (see demoPath in db.ts); embedDocument passes the source as the id key.
-  const docId = insertDoc(source, "hash", "md", "prose");
+export async function embedDocument(
+  source: string,
+  content: string,
+  type: string,
+  subject: string,
+) {
+  const docId = insertDoc(source, hash(content).toString(), type, subject);
   const chunks = await chunk(content);
   for (const c of chunks) {
     const id = insertDocChunk(docId, c);

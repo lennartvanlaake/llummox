@@ -30,7 +30,7 @@ export type WorkerConfig = {
 
 export async function createTaskWithSubs(
   prompt: string,
-  previousNotes: string = "",
+  previousTask?: TasksRow,
 ) {
   const task = await createTask({ prompt });
   const agent = new ToolLoopAgent({
@@ -40,7 +40,7 @@ export async function createTaskWithSubs(
   });
 
   await agent.generate({
-    prompt: `${prompt} ${previousNotes ?? `. The notes from the previous task are ${previousNotes}. `}The taskId which you use for creating subtasks is "${task.id}"`,
+    prompt: `${prompt} ${previousTask ?? `. The notes from the previous task with prompt ${previousTask!.prompt} are ${previousTask!.notes}. `}The taskId which you use for creating subtasks is "${task.id}"`,
   });
 
   return task;
@@ -121,23 +121,22 @@ export async function workOnPlan(
   prompts: string[],
   workerConfig: WorkerConfig,
 ) {
-  let previousTaskSummary = "";
+  let previousTask: TasksRow | undefined;
   for (const prompt of prompts) {
-    const task = await workOnTask(prompt, workerConfig, previousTaskSummary);
-    const summarized = await summarize(task);
-    previousTaskSummary = summarized?.notes ?? "";
+    const task = await workOnTask(prompt, workerConfig, previousTask);
+    previousTask = await summarize(task);
   }
 }
 
 export async function workOnTask(
   taskPrompt: string,
   workerConfig: WorkerConfig,
-  previousTaskSummary: string,
+  previousTask?: TasksRow,
 ) {
   let loopCount = 0;
 
   //
-  let task = await createTaskWithSubs(taskPrompt, previousTaskSummary);
+  let task = await createTaskWithSubs(taskPrompt, previousTask);
 
   let subtask = getNextSubtask(task.id);
 

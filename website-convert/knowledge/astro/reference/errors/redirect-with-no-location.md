@@ -1,0 +1,24 @@
+---
+# NOTE: This file is auto-generated from 'scripts/error-docgen.mjs'
+# Do not make edits to it directly, they will be overwritten.
+# Instead, change this file: https://github.com/withastro/astro/blob/main/packages/astro/src/core/errors/errors-data.ts
+# Translators, please remove this note and the <DontEditWarning/> component.
+
+title: A redirect must be given a location with the Location header.
+i18nReady: true
+githubURL: https://github.com/withastro/astro/blob/main/packages/astro/src/core/errors/errors-data.ts
+---
+import DontEditWarning from '~/components/DontEditWarning.astro'
+
+<DontEditWarning />
+
+
+> **RedirectWithNoLocation**: The redirect `Response` has no `Location` header. Use `Astro.redirect()` to create redirects, or add a `Location` header to the `Response`.
+
+## What went wrong?
+A redirect must be given a location with the `Location` header.
+
+**See Also:**
+-  
+
+

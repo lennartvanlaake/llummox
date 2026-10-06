@@ -1,0 +1,256 @@
+---
+title: Add last modified time
+description: Build a Markdown processor plugin to add the last modified time to your Markdown and MDX.
+i18nReady: true
+type: recipe
+---
+
+
+
+Learn how to build a  that adds the last modified time as a  of your Markdown and MDX files. Use this property to  display the modified time in your pages.
+
+:::note[Uses Git history]
+This recipe calculates time based on your repository’s Git history and may not be accurate on some deployment platforms. Your host may be performing **shallow clones** which do not retrieve the full git history.
+:::
+
+## Recipe
+
+<Steps>
+1. Install the following packages depending on the Markdown processor used:
+
+    <MarkdownProcessorTabs>
+      <Fragment slot="satteri">
+        -  to modify and format times
+        -  to configure 
+        -  to create a 
+
+        <PackageManagerTabs>
+          <Fragment slot="npm">
+            ```shell
+            npm install dayjs @astrojs/markdown-satteri satteri
+            ```
+          </Fragment>
+          <Fragment slot="pnpm">
+            ```shell
+            pnpm add dayjs @astrojs/markdown-satteri satteri
+            ```
+          </Fragment>
+          <Fragment slot="yarn">
+            ```shell
+            yarn add dayjs @astrojs/markdown-satteri satteri
+            ```
+          </Fragment>
+        </PackageManagerTabs>
+      </Fragment>
+      <Fragment slot="unified">
+        -  to modify and format times
+        -  to use 
+
+        <PackageManagerTabs>
+          <Fragment slot="npm">
+            ```shell
+            npm install dayjs @astrojs/markdown-remark
+            ```
+          </Fragment>
+          <Fragment slot="pnpm">
+            ```shell
+            pnpm add dayjs @astrojs/markdown-remark
+            ```
+          </Fragment>
+          <Fragment slot="yarn">
+            ```shell
+            yarn add dayjs @astrojs/markdown-remark
+            ```
+          </Fragment>
+        </PackageManagerTabs>
+      </Fragment>
+    </MarkdownProcessorTabs>
+
+2. Create a mdast plugin.
+
+    This plugin uses `execSync` to run a Git command that returns the timestamp of the latest commit in ISO 8601 format. The timestamp is then added to the frontmatter of the file.
+
+    <MarkdownProcessorTabs>
+      <Fragment slot="satteri">
+        ```js title="src/mdast/mdast-modified-time.ts"
+        import { execSync } from "node:child_process";
+        import { fileURLToPath } from "node:url";
+        import { defineMdastPlugin } from "satteri";
+
+        export const mdastModifiedTimePlugin = defineMdastPlugin({
+          name: "mdast-modified-time",
+          before(root, context) {
+            if (!context.fileURL) return;
+
+            const filepath = fileURLToPath(context.fileURL);
+            const result = execSync(`git log -1 --pretty="format:%cI" "${filepath}"`);
+
+            if (context.data.astro !== undefined) {
+              context.data.astro.frontmatter.lastModified = result.toString();
+            }
+          },
+        });
+        ```
+      </Fragment>
+      <Fragment slot="unified">
+        ```js title="remark-modified-time.mjs"
+        import { execSync } from "node:child_process";
+
+        export function remarkModifiedTime() {
+          return function (tree, file) {
+            const filepath = file.history[0];
+            const result = execSync(`git log -1 --pretty="format:%cI" "${filepath}"`);
+            file.data.astro.frontmatter.lastModified = result.toString();
+          };
+        }
+        ```
+      </Fragment>
+    </MarkdownProcessorTabs>
+
+    <details>
+    <summary>Using the file system instead of Git</summary>
+
+    Although using Git is the recommended way to get the last modified timestamp from a file, it is possible to use the file system modified time.
+    This plugin uses `statSync` to get the `mtime` (modified time) of the file in ISO 8601 format. The timestamp is then added to the frontmatter of the file.
+
+    <MarkdownProcessorTabs>
+      <Fragment slot="satteri">
+        ```js title="src/mdast/mdast-modified-time.ts"
+        import { statSync } from "node:fs";
+        import { fileURLToPath } from "node:url";
+        import { defineMdastPlugin } from "satteri";
+
+        export const mdastModifiedTimePlugin = defineMdastPlugin({
+          name: "mdast-modified-time",
+          before(node, context) {
+            if (!context.fileURL) return;
+
+            const filepath = fileURLToPath(context.fileURL);
+            const result = statSync(filepath);
+
+            if (context.data.astro !== undefined) {
+              context.data.astro.frontmatter.lastModified = result.mtime.toISOString();
+            }
+          },
+        });
+        ```
+      </Fragment>
+      <Fragment slot="unified">
+        ```js title="remark-modified-time.mjs"
+        import { statSync } from "node:fs";
+
+        export function remarkModifiedTime() {
+          return function (tree, file) {
+            const filepath = file.history[0];
+            const result = statSync(filepath);
+            file.data.astro.frontmatter.lastModified = result.mtime.toISOString();
+          };
+        }
+        ```
+      </Fragment>
+    </MarkdownProcessorTabs>
+    </details>
+
+3. Add the plugin to your config:
+
+    <MarkdownProcessorTabs>
+      <Fragment slot="satteri">
+        ```js title="astro.config.mjs"
+        import { satteri } from "@astrojs/markdown-satteri";
+        import { defineConfig } from "astro/config";
+        import { mdastModifiedTimePlugin } from "./src/mdast/mdast-modified-time";
+
+        export default defineConfig({
+          markdown: {
+            processor: satteri({
+              mdastPlugins: [mdastModifiedTimePlugin],
+            }),
+          },
+        });
+        ```
+      </Fragment>
+      <Fragment slot="unified">
+        ```js title="astro.config.mjs"
+        import { unified } from "@astrojs/markdown-remark";
+        import { defineConfig } from "astro/config";
+        import { remarkModifiedTime } from "./remark-modified-time.mjs";
+
+        export default defineConfig({
+          markdown: {
+            processor: unified({
+              remarkPlugins: [remarkModifiedTime],
+            }),
+          },
+        });
+        ```
+      </Fragment>
+    </MarkdownProcessorTabs>
+
+    Now all Markdown documents will have a `lastModified` property in their frontmatter.
+
+4. Display Last Modified Time
+
+    If your content is stored in a , access . Then render `lastModified` in your template wherever you would like it to appear.
+
+    ```astro title="src/pages/posts/[slug].astro" {3-4,6,17,19-21,31}
+    ---
+    import { getCollection, render } from "astro:content";
+    import dayjs from "dayjs";
+    import utc from "dayjs/plugin/utc";
+
+    dayjs.extend(utc);
+
+    export async function getStaticPaths() {
+      const blog = await getCollection("blog");
+      return blog.map((entry) => ({
+        params: { slug: entry.id },
+        props: { entry },
+      }));
+    }
+
+    const { entry } = Astro.props;
+    const { Content, remarkPluginFrontmatter } = await render(entry);
+
+    const lastModified = dayjs(remarkPluginFrontmatter.lastModified)
+      .utc()
+      .format("HH:mm:ss DD MMMM YYYY UTC");
+    ---
+
+    <html>
+      <head>
+        <meta charset="utf-8" />
+        <title>{entry.data.title}</title>
+      </head>
+      <body>
+        <title>{entry.data.title}</title>
+        <p>Last Modified: {lastModified}</p>
+        <Content />
+      </body>
+    </html>
+    ```
+
+    If you're using a , use the `lastModified` frontmatter property from `Astro.props` in your layout template.
+
+    ```astro title="src/layouts/BlogLayout.astro" {2-3,5,7-9,17}
+    ---
+    import dayjs from "dayjs";
+    import utc from "dayjs/plugin/utc";
+
+    dayjs.extend(utc);
+
+    const lastModified = dayjs()
+      .utc(Astro.props.frontmatter.lastModified)
+      .format("HH:mm:ss DD MMMM YYYY UTC");
+    ---
+
+    <html>
+      <head>
+        <meta charset="utf-8" />
+      </head>
+      <body>
+        <p>{lastModified}</p>
+        <slot />
+      </body>
+    </html>
+    ```
+</Steps>

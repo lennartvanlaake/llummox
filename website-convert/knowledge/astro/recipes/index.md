@@ -1,0 +1,21 @@
+---
+title: Astro recipes
+sidebar:
+  label: Recipes overview
+description: Short, focused how-to guides.
+i18nReady: true
+---
+
+
+
+See guided examples of adding features to your Astro project.
+
+## Official Recipes
+
+Astro's official recipes are short, focused how-to guides that walk a reader through completing a working example of a specific task. Recipes are a great way to add new features or behavior to your Astro project by following step-by-step instructions!
+
+<RecipesNav />
+
+## Community Resources
+
+<ReadMore>Find more recipes written and submitted by the community at .</ReadMore>
