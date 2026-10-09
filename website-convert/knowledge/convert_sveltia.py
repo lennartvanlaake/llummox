@@ -11,19 +11,28 @@ if os.path.exists(OUT):
     shutil.rmtree(OUT)
 os.makedirs(OUT)
 
-def fetch(url) -> str:
-    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
-    for attempt in range(3):
+def fetch(url):
+    import time
+    # ponytail: realistic delays + UA avoid rate-limit 404s from sveltiacms.app
+    headers = {
+        "User-Agent": "Mozilla/5.0 (X11; Linux x86_64; rv:109.0) Gecko/20100101 Firefox/115.0",
+        "Accept": "text/html,application/xml,application/xhtml+xml,*/*;q=0.8",
+    }
+    req = urllib.request.Request(url, headers=headers)
+    for attempt in range(8):
         try:
+            time.sleep(1.5)
             with urllib.request.urlopen(req, timeout=30) as r:
                 text = r.read().decode("utf-8", "replace")
             return text
         except Exception as e:
-            if attempt < 2:
-                import time
-                time.sleep(2 ** attempt)
-            raise
+            # ponytail: transient DNS/network flakiness — retry hard, then return partial
+            if attempt < 7:
+                time.sleep(2 ** (attempt + 1))
+            else:
+                return ""
 
+# ponytail: re.findall over <url><loc> tags — avoids <xhtml:link> RSS entries sharing same paths
 # Non-Astro frameworks to strip (other-SG paths, migration guides, non-Astro starter templates)
 NON_ASTRO = re.compile(
     r"(?im)^\s*(?:migrat(?:ing|ion|e)?|from|using|built with|powered by|based on)\s*[^\n]{0,40}(?:hugo|eleventy|11ty|next\.js|gatsby|nuxt|vue\.js|react|wordpress|jekyll|grav|decap|netlify cms|pages cms)\b[^\n]{0,30}(?:\.|\n|$)",
@@ -105,12 +114,16 @@ def clean_markdown(md):
 # Build page list from sitemap
 sitemap = fetch(f"{BASE}/sitemap.xml")
 # Only match <url> entries, not <xhtml:link> RSS entries which share the same paths
-urls = re.findall(r'<url><loc>(https://sveltiacms.app/en/docs/[^<]+)</loc></url>', sitemap)
+urls = re.findall(r'<url><loc>(https://sveltiacms.app/en/docs/[^<]+)</loc></url>', sitemap or "")
 
 converted, failed = 0, 0
 for slug in urls:
-    url = f"{BASE}{slug}"
+    # slug is a full URL from the sitemap; strip the host to get a fetch URL and a relative path
+    rel = slug.split(BASE, 1)[1][1:] if slug.startswith(BASE) else slug  # drop leading '/'
+    url = BASE + rel
     try:
+        import time as _t
+        _t.sleep(0.3)
         page = fetch(url)
     except Exception as e:
         print(f"FAILED fetch {slug}: {e}")
@@ -124,7 +137,7 @@ for slug in urls:
             continue
         md = html_to_md(content)
         md = clean_markdown(md)
-        parent = os.path.dirname(os.path.join(OUT, f"{slug}.md"))
+        parent = os.path.dirname(os.path.join(OUT, f"{rel}.md"))
         if parent and not os.path.isdir(parent):
             os.makedirs(parent, exist_ok=True)
         target = os.path.join(OUT, f"{slug}.md")

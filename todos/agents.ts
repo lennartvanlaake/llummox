@@ -4,7 +4,7 @@ import {
   updateTaskTool,
 } from "./tools.ts";
 import { mainModel } from "../shared/models";
-import { ToolLoopAgent, type Agent } from "ai";
+import { ToolLoopAgent, type Agent, type Tool } from "ai";
 import {
   createTask,
   getNextSubtask,
@@ -15,21 +15,25 @@ import {
 import { logger } from "../shared/utils.ts";
 import { TaskStatus } from "./constants.ts";
 import type { SubtasksRow, TasksRow } from "./schema.ts";
+import { HarnessAgent } from "@ai-sdk/harness/agent";
+import { AgentSession } from "@earendil-works/pi-coding-agent";
 
-const managerSystemPrompt = `You are an expect delegator. Create subtasks with conside descriptions. Be terse, no fluff, politeness or exclamations. Simplify and shorten language use. Use the createSubtask tool for delegation. EXTREMELY IMPORTANT: You are not allowed under any circumstance to complete the subtasks yourself. `;
+type AnyAgent = HarnessAgent | AgentSession;
+
+const managerSystemPrompt = `You are an expect delegator. Create subtasks with conside descriptions. Be terse, no fluff, politeness or exclamations. Simplify and shorten language use. Use the createSubtask tool for delegation. Your chat responses are irrelevant, answer ".". EXTREMELY IMPORTANT: You are not allowed under any circumstance to complete the subtasks yourself. `;
 
 const workerSystemPrompt = `You are a worker. You focus on executing the subtask as quickly as possible. You are part of a team that is executing a larger task. Use this only as context, do NOT do work outside of your subtask. If asked or needed, use your "updateSubtask" tool to report about your progress by editing notes. Change status to done if you are done, to "in-progress" if you finish without completing the subtask`;
 
-const summarizerSystemPrompt = `You are an expect summarizer. You consolidate all the notes of the completed subtasks into the notes of a task. Use the updateTask tool to write the notes. Preserve all technical information, remove duplication or anything that is not relevant to the purpose of the task. Be terse and laconoic. Convey maximum information in minimum characters.`;
+const summarizerSystemPrompt = `You are an expect summarizer. You consolidate all the notes of the completed subtasks into the notes of a task. Use the updateTask tool to write the notes. Preserve all technical information, remove duplication or anything that is not relevant to the purpose of the task. Be terse and laconoic. Convey maximum information in minimum characters. Your chat responses are irrelevant, answer ".". `;
 
-const defaultWorkerAgent = new ToolLoopAgent({
+const defaultBasicWorkerAgent = new ToolLoopAgent({
   model: mainModel,
   tools: {
     updateSubtask: updateSubtaskWorkerTool,
   },
   instructions: workerSystemPrompt,
   prepareStep: async ({ messages, stepNumber }) => {
-    if (stepNumber > 10) {
+    if (stepNumber == 10) {
       return {
         messages: [
           ...messages,
@@ -52,7 +56,7 @@ const defaultManagerAgent = new ToolLoopAgent({
 
 type TaskConfig = {
   prompt: string;
-  worker?: Agent;
+  worker?: AnyAgent;
   manager?: Agent;
 };
 
@@ -63,8 +67,9 @@ export async function createTaskWithSubs(
   const task = await createTask({ prompt: taskConfig.prompt });
 
   const agent = taskConfig?.manager ?? defaultManagerAgent;
+
   await agent.generate({
-    prompt: `${prompt} ${previousTask ?? `. The notes from the previous task with prompt ${previousTask!.prompt} are ${previousTask!.notes}. `}The taskId which you use for creating subtasks is "${task.id}"`,
+    prompt: `${taskConfig.prompt} ${previousTask ? `. The notes from the previous task with prompt ${previousTask!.prompt} are ${previousTask!.notes}. ` : ""}The taskId which you use for creating subtasks is "${task.id}"`,
   });
 
   return task;
@@ -73,7 +78,7 @@ export async function createTaskWithSubs(
 export async function doWork(
   task: TasksRow,
   subtask: SubtasksRow,
-  agent: Agent,
+  agent: AnyAgent,
 ) {
   if (!subtask) {
     logger.info("No subtask found, returning");
@@ -89,9 +94,14 @@ export async function doWork(
       ? ""
       : `You are not the first worker to tackle this task. Status: ${subtask.status}. Notes: ${subtask.notes}.`;
 
-  return await agent.generate({
-    prompt: `The team is working on the larger task (CONTEXT ONLY): "${task.prompt}". Your subtask is "${subtask.title} - ${subtask.description} and has id ${subtask.id}. ${notesPrompt}.`,
-  });
+  const prompt = `The team is working on the larger task (CONTEXT ONLY): "${task.prompt}". Your subtask is "${subtask.title} - ${subtask.description} and has id ${subtask.id}. ${notesPrompt}.`;
+  if (agent instanceof ToolLoopAgent) {
+    await (agent as ToolLoopAgent).generate({
+      prompt,
+    });
+  } else {
+    await (agent as AgentSession).prompt(prompt);
+  }
 }
 
 async function summarize(task: TasksRow) {
@@ -136,7 +146,12 @@ export async function workOnTask(
     logger.info(subtask);
     try {
       // TODO sort this out
-      await doWork(task, subtask, taskConfig?.worker ?? defaultWorkerAgent);
+      await doWork(
+        task,
+        subtask,
+        // ts is being weird here, idk
+        taskConfig?.worker ?? (defaultBasicWorkerAgent as any),
+      );
     } catch (e) {
       logger.error(e);
     }

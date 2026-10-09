@@ -13,7 +13,9 @@ describe("Test the todo worker agent", () => {
 
   // findings: relative/absolute path issues
   it("Worker agent picks up the work", async () => {
-    await workOnPlan(["Create subtasks for calculating 1+1, 1+2 and 2+2."], {});
+    await workOnPlan([
+      { prompt: "Create subtasks for calculating 1+1, 1+2 and 2+2." },
+    ]);
 
     const all = await listTasks();
     expect(all.length).toBeGreaterThan(0);
