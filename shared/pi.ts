@@ -1,26 +1,32 @@
 import {
   createAgentSession,
   ModelRuntime,
-  createExtensionRuntime,
   type ResourceLoader,
+  DefaultResourceLoader,
 } from "@earendil-works/pi-coding-agent";
 import { logger } from "../shared/utils";
 
 export type PiSessionConfig = {
+  cwd: string;
   model?: string;
-
-  systemPrompt?: string;
+  systemPrompt: string;
 };
 
-export async function getPiSession(config: PiSessionConfig = {}) {
+export async function createPiSession(config: PiSessionConfig) {
   const modelRuntime = await ModelRuntime.create();
 
+  const fileBasedResourceLoader = new DefaultResourceLoader({
+    cwd: config.cwd,
+    agentDir: `${import.meta.dir}/piConfig`,
+    systemPromptOverride: () => config.systemPrompt ?? "",
+    additionalExtensionPaths: [`${import.meta.dir}/llummoxPiExtension.ts`],
+  });
+
+  await fileBasedResourceLoader.reload();
+
+  // pick and choose from file-based thingie
   const resourceLoader: ResourceLoader = {
-    getExtensions: () => ({
-      extensions: [],
-      errors: [],
-      runtime: createExtensionRuntime(),
-    }),
+    getExtensions: () => fileBasedResourceLoader.getExtensions(),
     getSkills: () => ({ skills: [], diagnostics: [] }),
     getPrompts: () => ({ prompts: [], diagnostics: [] }),
     getThemes: () => ({ themes: [], diagnostics: [] }),

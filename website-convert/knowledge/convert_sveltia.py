@@ -6,10 +6,11 @@ import re, sys, shutil, os, html
 import urllib.request
 
 BASE = "https://sveltiacms.app"
-OUT = "/home/lennart/repos/llumox/website-convert/knowledge/sveltia"
-if os.path.exists(OUT):
+# ponytail: dry-run via env override so we can preview before committing to OUT
+OUT = os.environ.get("SVELTIA_OUT", "/home/lennart/repos/llumox/website-convert/knowledge/sveltia")
+if OUT and os.path.exists(OUT):
     shutil.rmtree(OUT)
-os.makedirs(OUT)
+os.makedirs(OUT, exist_ok=True)
 
 def fetch(url):
     import time
@@ -117,6 +118,9 @@ sitemap = fetch(f"{BASE}/sitemap.xml")
 urls = re.findall(r'<url><loc>(https://sveltiacms.app/en/docs/[^<]+)</loc></url>', sitemap or "")
 
 converted, failed = 0, 0
+# ponytail: dry-run preview is capped; full run drops the limit
+if os.environ.get("SVELTIA_DRY_RUN") == "1":
+    urls = urls[:25]
 for slug in urls:
     # slug is a full URL from the sitemap; strip the host to get a fetch URL and a relative path
     rel = slug.split(BASE, 1)[1][1:] if slug.startswith(BASE) else slug  # drop leading '/'
@@ -137,10 +141,9 @@ for slug in urls:
             continue
         md = html_to_md(content)
         md = clean_markdown(md)
-        parent = os.path.dirname(os.path.join(OUT, f"{rel}.md"))
-        if parent and not os.path.isdir(parent):
-            os.makedirs(parent, exist_ok=True)
-        target = os.path.join(OUT, f"{slug}.md")
+        # flatten nested doc paths to one file per page (flat layout)
+        target_rel = f"{slug.split('/')[-1]}.md"
+        target = os.path.join(OUT, target_rel)
         with open(target, "w", encoding="utf-8") as f:
             f.write(md)
         converted += 1

@@ -3,12 +3,15 @@ import { existsSync } from "node:fs";
 import { $ } from "bun";
 import type { MainStateType } from ".";
 
+function getBaseProjectDir(project: string) {
+  return `${import.meta.dir}/projects/${project}`;
+}
 function getBaseOriginDir(project: string) {
-  return `${import.meta.dir}/projects/${project}/original`;
+  return `${getBaseProjectDir(project)}/original`;
 }
 
 function getBaseTargetDir(project: string) {
-  return `${import.meta.dir}/projects/${project}/target`;
+  return `${getBaseProjectDir(project)}/target`;
 }
 
 function directoryNotEmpty(dir: string) {
@@ -42,6 +45,7 @@ export async function init(state: MainStateType): Promise<MainStateType> {
     state.targetDir = `${targetDir}`;
   }
 
+  state.projectDir = getBaseProjectDir(state.project);
   if (state.originDir === "") state.originDir = getBaseOriginDir(state.project);
   if (state.targetDir === "") state.targetDir = getBaseTargetDir(state.project);
 

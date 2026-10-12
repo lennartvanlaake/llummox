@@ -1,9 +1,10 @@
 import { describe, it, expect, beforeEach } from "bun:test";
 import { setupDatabase } from "../db";
-import { workOnPlan, workOnTask } from "../agents";
+import { workOnPlan, workOnTask, workerSystemPrompt } from "../agents";
 import { listSubtasks, listTasks } from "../crud.ts";
 import { registerTelemetry } from "ai";
 import { DevToolsTelemetry } from "@ai-sdk/devtools";
+import { createPiSession } from "../pi.ts";
 
 describe("Test the todo worker agent", () => {
   beforeEach(() => {
@@ -12,9 +13,17 @@ describe("Test the todo worker agent", () => {
   });
 
   // findings: relative/absolute path issues
-  it("Worker agent picks up the work", async () => {
+  it("Pi worker agent does actual work", async () => {
+    const piWorker = await createPiSession({
+      cwd: "/tmp",
+      systemPrompt: workerSystemPrompt,
+    });
+
     await workOnPlan([
-      { prompt: "Create subtasks for calculating 1+1, 1+2 and 2+2." },
+      {
+        prompt: "Create subtasks for calculating 1+1, 1+2 and 2+2.",
+        worker: piWorker,
+      },
     ]);
 
     const all = await listTasks();

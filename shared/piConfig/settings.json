@@ -1,0 +1,16 @@
+{
+  "lastChangelogVersion": "0.84.1",
+  "theme": "dark",
+  "packages": [
+  ],
+  "defaultThinkingLevel": "low",
+  "steeringMode": "one-at-a-time",
+  "defaultProvider": "llama-server=http://127.0.0.1:8080",
+  "defaultModel": "Ornith",
+  "compaction": {
+    "enabled": true,
+    "reserveTokens": 10000,
+    "keepRecentTokens": 5000
+  },
+  "quietStartup": true
+}

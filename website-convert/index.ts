@@ -5,6 +5,7 @@ const MainState = z.object({
   url: z.string(),
   project: z.string(),
   originDir: z.string().default(""),
+  projectDir: z.string().default(""),
   targetDir: z.string().default(""),
 });
 
@@ -14,6 +15,7 @@ export async function run(state: MainStateType) {
   await init({
     url: state.url,
     project: state.project,
+    projectDir: state.projectDir,
     originDir: state.originDir,
     targetDir: state.targetDir,
   });

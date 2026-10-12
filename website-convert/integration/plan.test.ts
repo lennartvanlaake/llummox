@@ -15,7 +15,8 @@ describe("Testing the planning function", () => {
       url: "",
       project: "mf",
       originDir: `${import.meta.dir}/fixtures/mf/original`,
-      targetDir: "",
+      targetDir: `${import.meta.dir}/fixtures/mf/target`,
+      projectDir: `${import.meta.dir}/fixtures/mf`,
     });
   }, 0);
 

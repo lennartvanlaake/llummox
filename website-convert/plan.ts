@@ -1,6 +1,11 @@
 import { getTree } from "../shared/scout/functions";
 import type { MainStateType } from ".";
-import { workOnPlan, type WorkerConfig } from "../todos/agents";
+import {
+  createWorkerAgent,
+  defaultBasicWorkerAgent,
+  type TaskConfig,
+  workOnPlan,
+} from "../todos/agents";
 import {
   grepRecursive,
   ls,
@@ -8,31 +13,36 @@ import {
   searchHtml,
   simplifyHtml,
 } from "../shared/scout/tools";
+import { getPiSession } from "../todos/pi";
 
 export async function plan(state: MainStateType) {
   const tree = JSON.stringify(await getTree(state.originDir));
 
-  const workerConfig: WorkerConfig = {
-    workingDir: state.originDir,
-    tools: {
-      ls,
-      simplifyHtml,
-      searchHtml,
-      readLines,
-      grepRecursive,
-    },
-    prompt: `Your work is to report and analyse HTML files. Avoid reading the files fully, prefer simplifyHtml and searchHtml. Report goes into the "notes" of the subtask`,
+  const tools = {
+    ls,
+    simplifyHtml,
+    searchHtml,
+    readLines,
+    grepRecursive,
   };
 
-  await workOnPlan(
-    [
-      `You are studying the website at ${state.originDir}. Have your workers research its structure and content. The directory tree looks like this: ${tree}. Distribute the research into small subtasks. Subtasks either cover a set of related smaller files (<5KB) or 1 >5KB file`,
+  const scoutConfig: TaskConfig = {
+    worker: createWorkerAgent({
+      extraTools: tools,
+      systemPromptAppend: `The directory tree looks like this: ${tree}. Your work is to report and analyse HTML files. Avoid reading the files fully, prefer simplifyHtml and searchHtml. Report goes into the "notes" of the subtask`,
+    }),
 
-      // TODO improve prompt
-      `Plan to convert the website into a astro webpage with Sveltia CMS`,
-    ],
-    workerConfig,
-  );
+    prompt: `You are studying the website at ${state.originDir}. Have your workers research its structure and content. The directory tree looks like this: ${tree}. Distribute the research into small subtasks. Subtasks either cover a set of related smaller files (<5KB) or 1 >5KB file`,
+  };
 
-  // TODO take scout reports and turn them into a full on plan
+  const coderConfig: TaskConfig = {
+    worker: await getPiSession({
+      cwd: state.projectDir,
+      systemPrompt: `You are an expert web developer. Prefer using edit over write when possible. The directory tree looks like this: ${tree}.`,
+    }),
+
+    prompt: `Convert the website at ${state.originDir} to an astro website with Sveltia CMS at ${state.targetDir}.  The directory tree looks like this: ${tree}. Distribute the research into small subtasks.`,
+  };
+
+  await workOnPlan([scoutConfig, coderConfig]);
 }
