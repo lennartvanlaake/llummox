@@ -1,8 +1,8 @@
 import { getTree } from "../shared/scout/functions";
 import type { MainStateType } from ".";
 import {
+  createPiWorkerAgent,
   createWorkerAgent,
-  defaultBasicWorkerAgent,
   type TaskConfig,
   workOnPlan,
 } from "../todos/agents";
@@ -13,7 +13,6 @@ import {
   searchHtml,
   simplifyHtml,
 } from "../shared/scout/tools";
-import { getPiSession } from "../todos/pi";
 
 export async function plan(state: MainStateType) {
   const tree = JSON.stringify(await getTree(state.originDir));
@@ -27,6 +26,7 @@ export async function plan(state: MainStateType) {
   };
 
   const scoutConfig: TaskConfig = {
+    cwd: state.originDir,
     worker: createWorkerAgent({
       extraTools: tools,
       systemPromptAppend: `The directory tree looks like this: ${tree}. Your work is to report and analyse HTML files. Avoid reading the files fully, prefer simplifyHtml and searchHtml. Report goes into the "notes" of the subtask`,
@@ -36,9 +36,10 @@ export async function plan(state: MainStateType) {
   };
 
   const coderConfig: TaskConfig = {
-    worker: await getPiSession({
+    cwd: state.projectDir,
+    worker: await createPiWorkerAgent({
       cwd: state.projectDir,
-      systemPrompt: `You are an expert web developer. Prefer using edit over write when possible. The directory tree looks like this: ${tree}.`,
+      systemPromptAppend: `You are an expert web developer. Prefer using edit over write when possible. The directory tree looks like this: ${tree}.`,
     }),
 
     prompt: `Convert the website at ${state.originDir} to an astro website with Sveltia CMS at ${state.targetDir}.  The directory tree looks like this: ${tree}. Distribute the research into small subtasks.`,

@@ -13,10 +13,10 @@ describe("Testing the planning function", () => {
   test("test planning on very small project", async () => {
     await plan({
       url: "",
-      project: "mf",
-      originDir: `${import.meta.dir}/fixtures/mf/original`,
-      targetDir: `${import.meta.dir}/fixtures/mf/target`,
-      projectDir: `${import.meta.dir}/fixtures/mf`,
+      project: "portfolio",
+      originDir: `${import.meta.dir}/fixtures/portfolio/original`,
+      targetDir: `${import.meta.dir}/fixtures/portfolio/target`,
+      projectDir: `${import.meta.dir}/fixtures/portfolio`,
     });
   }, 0);
 

@@ -17,6 +17,7 @@ import { TaskStatus } from "./constants.ts";
 import type { SubtasksRow, TasksRow } from "./schema.ts";
 import { HarnessAgent } from "@ai-sdk/harness/agent";
 import { AgentSession } from "@earendil-works/pi-coding-agent";
+import { createPiSession } from "../shared/pi.ts";
 
 type AnyAgent = ToolLoopAgent | AgentSession;
 type WorkerAgentOptions = {
@@ -24,10 +25,11 @@ type WorkerAgentOptions = {
   systemPromptAppend?: string;
 };
 type PiWorkerAgentOptions = {
-  extraTools: Record<string, any>;
+  cwd: string;
   systemPromptAppend?: string;
 };
 export type TaskConfig = {
+  cwd: string;
   prompt: string;
   worker: AnyAgent;
   manager?: Agent;
@@ -67,7 +69,13 @@ export function createWorkerAgent(options: WorkerAgentOptions): ToolLoopAgent {
   return agent;
 }
 
-export function createPiWorkerAgent = 
+export function createPiWorkerAgent(options: PiWorkerAgentOptions) {
+  return createPiSession({
+    cwd: options.cwd,
+    extensionPaths: [`${import.meta.dir}/llummoxPiExtension.ts`],
+    systemPrompt: `${workerSystemPrompt} ${options.systemPromptAppend ?? ""}`,
+  });
+}
 
 export const defaultManagerAgent = new ToolLoopAgent({
   model: mainModel,
