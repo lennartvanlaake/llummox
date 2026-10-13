@@ -8,7 +8,7 @@ import { join } from "path";
 
 const DB_PATH = ":memory:";
 
-let db: Database;
+let db;
 
 beforeAll(() => {
   db = setupDatabase(DB_PATH);

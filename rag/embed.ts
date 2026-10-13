@@ -2,17 +2,16 @@ import { insertDoc, insertDocChunk, insertDocVector } from "./db";
 import { EMBEDDING_DIMENSIONS } from "./constants";
 import { pipeline } from "@huggingface/transformers";
 
-import { RecursiveCharacterTextSplitter } from "@langchain/textsplitters";
+import { RecursiveChunker } from "@chonkiejs/core";
 import { hash } from "bun";
 
 let transformerEmbedder: any;
 
-async function chunk(text: string, size = 800, overlap = 100) {
-  const splitter = new RecursiveCharacterTextSplitter({
+async function chunk(text: string, size = 800) {
+  const splitter = await RecursiveChunker.create({
     chunkSize: size,
-    chunkOverlap: overlap,
   });
-  const texts = await splitter.splitText(text);
+  const texts = await splitter.chunk(text);
   return texts;
 }
 
@@ -80,8 +79,8 @@ export async function embedDocument(
   const docId = insertDoc(source, hash(content).toString(), type, subject);
   const chunks = await chunk(content);
   for (const c of chunks) {
-    const id = insertDocChunk(docId, c);
-    const embedding = await embed(c);
+    const id = insertDocChunk(docId, c.text);
+    const embedding = await embed(c.text);
 
     insertDocVector(id, embedding);
   }

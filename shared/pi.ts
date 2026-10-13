@@ -1,8 +1,8 @@
 import {
   createAgentSession,
+  DefaultResourceLoader,
   ModelRuntime,
   type ResourceLoader,
-  DefaultResourceLoader,
 } from "@earendil-works/pi-coding-agent";
 import { logger } from "../shared/utils";
 
@@ -10,6 +10,7 @@ export type PiSessionConfig = {
   cwd: string;
   model?: string;
   systemPrompt: string;
+  extensionPaths?: string[];
 };
 
 export async function createPiSession(config: PiSessionConfig) {
@@ -19,7 +20,7 @@ export async function createPiSession(config: PiSessionConfig) {
     cwd: config.cwd,
     agentDir: `${import.meta.dir}/piConfig`,
     systemPromptOverride: () => config.systemPrompt ?? "",
-    additionalExtensionPaths: [`${import.meta.dir}/llummoxPiExtension.ts`],
+    additionalExtensionPaths: config?.extensionPaths ?? [],
   });
 
   await fileBasedResourceLoader.reload();

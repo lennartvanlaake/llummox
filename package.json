@@ -8,8 +8,6 @@
     "todos:migrations": "bunx drizzle-kit generate --dialect sqlite --schema ./schema.ts"
   },
   "devDependencies": {
-    "@langchain/community": "^1.1.29",
-    "@types/better-sqlite3": "^7.6.12",
     "@types/bun": "latest",
     "drizzle-kit": "^0.31.10"
   },
@@ -17,27 +15,12 @@
     "typescript": "^5"
   },
   "dependencies": {
-    "@ai-sdk/devtools": "^1.0.26",
-    "@ai-sdk/harness": "^1.0.147",
-    "@ai-sdk/harness-pi": "^1.0.149",
-    "@ai-sdk/openai": "^4.0.66",
-    "@ai-sdk/openai-compatible": "^3.0.48",
-    "@ai-sdk/sandbox-vercel": "^1.0.147",
-    "@anthropic-ai/sandbox-runtime": "^0.0.75",
+    "@chonkiejs/core": "^0.0.12",
     "@earendil-works/pi-coding-agent": "^1.1.0",
     "@huggingface/transformers": "^4.2.0",
-    "@langchain/langgraph": "^1.4.13",
-    "@langchain/openai": "^1.5.10",
-    "@langchain/textsplitters": "^1.0.1",
-    "@xenova/transformers": "^2.17.2",
-    "ai": "^7.0.99",
-    "better-sqlite3": "^11.8.1",
-    "deepagents": "^1.13.2",
-    "directory-tree": "^3.6.0",
     "drizzle-orm": "^0.45.2",
-    "langchain": "^1.5.10",
+    "install": "^0.13.0",
     "pino": "^10.3.1",
-    "sqlite-vec": "^0.1.9",
-    "sqlite3": "^5.1.6"
+    "sqlite-vec": "^0.1.9"
   }
 }

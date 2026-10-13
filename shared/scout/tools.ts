@@ -18,19 +18,6 @@ export const wc = tool({
   },
 });
 
-export const ls = tool({
-  description: "Lists directory contents",
-  inputSchema: z.object({
-    path: z.string().describe("Directory or file to list"),
-  }),
-  contextSchema: z.object({
-    workingDir: z.string(),
-  }),
-  execute: async ({ path }, { context }) => {
-    return sandboxCommand(context.workingDir, `ls ${path}`);
-  },
-});
-
 export const grepRecursive = tool({
   description: "Recursively searches for a pattern in a directory",
   inputSchema: z.object({

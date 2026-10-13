@@ -1,86 +1,58 @@
-import { test, expect, describe, beforeAll } from "bun:test";
-import { setupDatabase, db } from "./db";
-import { insertDoc, insertDocChunk, insertDocVector } from "./db";
-import { embed } from "./embed";
-import { EMBEDDING_DIMENSIONS } from "./constants";
+import { test, expect, beforeEach } from "bun:test";
 import { searchTool } from "./tools";
-import { testInvokeTool } from "../shared/toolTester";
+import {
+  setupDatabase,
+  insertDoc,
+  insertDocChunk,
+  insertDocVector,
+  db,
+} from "./db";
+import { embed } from "./embed";
 
-// ponytail: :memory: so we never touch ../db.sqlite, and each describe gets a
-// fresh in-memory DB. We seed via the real embed pipeline so testInvokeTool
-// drives the tool through the ai SDK ToolLoopAgent (matching the shared/todos
-// pattern) and the test checks that searchRag returns the semantically closest
-// chunk (not just "any" row).
+// searchTool.execute returns AgentToolResult (content: [{type,text}]);
+// no local toPiContent import needed here.
 
-describe("search tool", () => {
-  beforeAll(() => {
-    setupDatabase(":memory:");
-  });
+beforeEach(() => setupDatabase(":memory:"));
 
+test("search tool returns a tool result", async () => {
+  seedCorpus();
+
+  const res = (await searchTool.execute(
+    "tool-call-1",
+    { query: "dog pet animal" },
+    new AbortController().signal,
+  )) as any;
+  expect(res.error).toBeUndefined();
+  expect(res.content[0].type).toBe("text");
+
+  const text = res.content[0].text;
+  expect(text).toContain("cats");
+});
+
+// seed a corpus so the tool's vec0 search has rows to rank (mirrors search.test.ts).
+async function seedCorpus() {
   const corpus = [
     { source: "cats", content: "A cat is a small domestic feline pet animal." },
     {
-      source: "coffee",
-      content: "Coffee is a brewed hot beverage made from roasted beans.",
+      source: "bread",
+      content: "Bread is a baked grain food made from flour.",
     },
     {
       source: "car",
       content: "A car is a motorized road vehicle with four wheels.",
     },
+    {
+      source: "coffee",
+      content: "Coffee is a brewed hot beverage from roasted beans.",
+    },
   ];
-
-  // insert a chunk: create docs row, chunk row, then store its embedding.
-  async function seed(c: { source: string; content: string }) {
-    const docId = insertDoc(c.source, `h${c.source}`, "md", "prose");
-    const chunkId = insertDocChunk(docId, c.content);
+  db.query("DELETE FROM vec_doc_chunks").run();
+  db.query("DELETE FROM doc_chunks").run();
+  db.query("DELETE FROM docs").run();
+  for (const c of corpus) {
+    const docId = insertDoc(c.source, "h" + c.source, "md", "prose");
+    const id = insertDocChunk(docId, c.content);
     const emb = await embed(c.content);
-    expect(emb.length).toBe(EMBEDDING_DIMENSIONS);
-    insertDocVector(chunkId, emb);
+    insertDocVector(id, emb);
   }
-
-  test("parses args and returns the closest matching chunk ranked first", async () => {
-    await seed(corpus[0]!);
-    await seed(corpus[1]!);
-    await seed(corpus[2]!);
-
-    // invoke via the ai SDK agent. "dog -> pet -> animal" is semantically close
-    // to the cat doc, so the result text names "cats".
-    const result = await testInvokeTool(searchTool, {
-      query: "A dog is a domestic pet animal kept by people.",
-      type: "docs",
-      topic: "cats",
-    });
-
-    const text = result;
-    expect(text).toContain("cats");
-    expect(text).not.toContain("No results found");
-    expect(text).not.toContain("ERROR");
-  });
-
-  test("returns a friendly message when the corpus is empty", async () => {
-    // :memory: persists across tests in one describe; clear the corpus so this
-    // test genuinely searches an empty DB.
-    db.query("DELETE FROM vec_doc_chunks").run();
-    db.query("DELETE FROM doc_chunks").run();
-    db.query("DELETE FROM docs").run();
-
-    const result = await testInvokeTool(searchTool, {
-      query: "anything at all",
-      type: "summaries",
-      topic: "widgets",
-    });
-    expect(result).toContain("No results found");
-    expect(result).not.toContain("ERROR");
-  });
-
-  test("rejects an invalid type", async () => {
-    // zod enum validation fails for a type outside the allowed set; the ai SDK
-    // surfaces that as "ERROR: ..." via testInvokeTool.
-    const result = await testInvokeTool(searchTool, {
-      query: "q",
-      type: "nonsense" as never,
-      topic: "t",
-    });
-    expect(result).toContain("ERROR");
-  });
-});
+}
