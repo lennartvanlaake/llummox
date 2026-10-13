@@ -1,0 +1,12 @@
+{ 
+
+   "compilerOptions": {
+
+   "composite": true
+}
+
+  "references": [
+    { "path": "../shared" }
+  ],
+   "extends": "../tsconfig.json"
+}

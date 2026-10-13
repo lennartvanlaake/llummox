@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from "zod/v4";
 import { init } from "./init.ts";
 
 const MainState = z.object({
