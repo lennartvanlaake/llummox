@@ -7,13 +7,11 @@ import {
   workerSystemPrompt,
 } from "../agents";
 import { listSubtasks, listTasks } from "../crud.ts";
-import { registerTelemetry } from "ai";
-import { DevToolsTelemetry } from "@ai-sdk/devtools";
+// ponytail: `ai`/`@ai-sdk` removed — telemetry registration dropped from tests.
 
 describe("Test the todo worker agent", () => {
   beforeEach(() => {
     setupDatabase(":memory:");
-    registerTelemetry(DevToolsTelemetry() as any);
   });
 
   // findings: relative/absolute path issues

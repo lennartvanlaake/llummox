@@ -10,7 +10,6 @@ describe("crud tasks", () => {
 
     const created = await crud.createTask({
       prompt: "T1",
-      description: "d",
     });
     expect(created.id).toBeTruthy();
 
@@ -34,7 +33,6 @@ describe("crud subtasks", () => {
     db = setupDatabase(":memory:");
     const task = await crud.createTask({
       prompt: "T",
-      description: "d",
     });
 
     const st = await crud.createSubtask({

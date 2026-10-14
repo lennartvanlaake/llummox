@@ -3,20 +3,18 @@ import { setupDatabase } from "../db";
 import { createTask, deleteTask } from "../crud.ts";
 import { createTaskWithSubs } from "../agents";
 import { listSubtasks } from "../crud.ts";
-import { registerTelemetry } from "ai";
-import { DevToolsTelemetry } from "@ai-sdk/devtools";
+// ponytail: `ai`/`@ai-sdk` removed — telemetry registration dropped from tests.
 
 describe("Test the todo manager agent (creates subtasks only)", () => {
   beforeEach(() => {
     setupDatabase(":memory:");
-    registerTelemetry(DevToolsTelemetry() as any);
   });
 
   it("Creates subtasks when asked, under a pre-existing task", async () => {
     const task = await createTask({ prompt: "do maths" });
-    await createTaskWithSubs(
-      "Create subtasks for calculating 1+1, 1+2 and 2+2. Do three subtasks.",
-    );
+    await createTaskWithSubs({
+      prompt: "Create subtasks for calculating 1+1, 1+2 and 2+2. Do three subtasks.",
+    });
 
     const subtasks = await listSubtasks(task.id);
     expect(subtasks.length).toBe(3);
@@ -26,7 +24,9 @@ describe("Test the todo manager agent (creates subtasks only)", () => {
 
   it("Generates subtasks without explicit instructions", async () => {
     const task = await createTask({ prompt: "build a treehouse" });
-    await createTaskWithSubs("Help me plan the building of my treehouse");
+    await createTaskWithSubs({
+      prompt: "Help me plan the building of my treehouse",
+    });
 
     const subtasks = await listSubtasks(task.id);
     expect(subtasks.length).toBeGreaterThan(0);

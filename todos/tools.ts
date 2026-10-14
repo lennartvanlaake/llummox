@@ -1,172 +1,160 @@
-import { z } from "zod/v4";
 import * as crud from "./crud";
-import { tool } from "ai";
 import { TASK_STATUSES } from "./constants";
 
+import { Type } from "@earendil-works/pi-ai";
+import { defineTool } from "@earendil-works/pi-coding-agent";
+import { toPiContent } from "../shared/utils";
 // ---- Task (story) tools ---------------------------------------------------
-
-export const updateTaskTool = tool({
+export const updateTaskTool = defineTool({
+  label: "update_task",
+  name: "Update task",
   description:
     "Update fields of a task (story). Providing a field changes it; omit it to leave it unchanged. Empty string clears a text field.",
-  inputSchema: z.object({
-    taskId: z.string().describe("Task id to update."),
-    status: z
-      .string()
-      .optional()
-      .describe("New status. Omit to leave unchanged."),
-    notes: z
-      .string()
-      .optional()
-      .describe("New notes. Omit to leave unchanged."),
+  parameters: Type.Object({
+    taskId: Type.String({ description: "Task id to update." }),
+    status: Type.Optional(Type.String({ description: "New status. Omit to leave unchanged." })),
+    notes: Type.Optional(
+      Type.String({ description: "New notes. Omit to leave unchanged." })
+    )
   }),
-  // ponytail: tasks are managed statically (no AI), so this tool only flips
-  // status/notes — prompt is set once and edited out of band.
-  outputSchema: z.object({
-    error: z.string().optional(),
-  }),
-  execute: async (input) => {
+  execute: async (_toolCallId, params) => {
     try {
-      const before = crud.getTask(input.taskId);
+      const before = crud.getTask(params.taskId);
       if (!before)
-        throw new Error(`Task with id ${input.taskId} does not exist`);
+        throw new Error(`Task with id ${params.taskId} does not exist`);
       const changes = {
         status: before.status,
         notes: before.notes,
       };
 
-      if (input.status !== undefined) changes.status = input.status;
-      if (input.notes !== undefined) changes.notes = input.notes;
+      if (params.status !== undefined) changes.status = params.status;
+      if (params.notes !== undefined) changes.notes = params.notes;
 
-      await crud.updateTask(input.taskId, changes);
-      return {};
+      return toPiContent(crud.updateTask(params.taskId, changes));
     } catch (e) {
-      return { error: `error: ${(e as Error).message}` };
+      return toPiContent({ error: `error: ${(e as Error).message}` }, true);
     }
   },
 });
 
 // ---- Subtask tools --------------------------------------------------------
-//
 
-export const getSubtasksTool = tool({
+export const getSubtasksTool = defineTool({
+  label: "get_subtasks",
+  name: "Get Subtasks",
   description: "Gets all subtasks of a task",
-  inputSchema: z.object({ taskId: z.string() }),
-  outputSchema: z.array(
-    z.object({
-      id: z.string(),
-      title: z.string(),
-      description: z.string(),
-      notes: z.string(),
-      status: z.string(),
-    }),
-  ),
-  execute: async (input) => {
-    const subtasks = crud.getSubtasks(input.taskId);
-    return subtasks.map((it) => {
-      const { id, title, description, notes, status } = it;
-      return { id, title, description, notes, status };
+  parameters: Type.Object({
+    taskId: Type.String({ description: "Task id to fetch subtasks for." }),
+  }),
+  outputSchema: Type.Object({
+    subtasks: Type.Array(Type.Object({
+      id: Type.String({}),
+      title: Type.String({}),
+      description: Type.String({}),
+      notes: Type.String({}),
+      status: Type.String({}),
+    })),
+  }),
+  execute: async (_toolCallId, params) => {
+    const subtasks = crud.getSubtasks(params.taskId);
+    return toPiContent({
+      subtasks: subtasks.map((it) => ({
+        id: it.id,
+        title: it.title,
+        description: it.description,
+        notes: it.notes,
+        status: it.status,
+      }))
     });
   },
 });
 
-export const createSubtaskTool = tool({
+export const createSubtaskTool = defineTool({
+  label: "create_subtask",
+  name: "Create Subtask",
   description: "Create a subtask. Requires a taskId obtained by creating task.",
-  inputSchema: z.object({
-    title: z.string().min(1).describe("Subtask title."),
-    description: z
-      .string()
-      .min(1)
-      .describe(
-        "Details of the step. Make this clear enough to be picked up by an LLM agent.",
-      ),
-    taskId: z.string().describe("Task id (uuid) this subtask belongs to."),
+  parameters: Type.Object({
+    title: Type.String({ description: "Subtask title." }),
+    description: Type.String({
+      description: "Details of the step. Make this clear enough to be picked up by an LLM agent.",
+    }),
+    taskId: Type.String({ description: "Task id (uuid) this subtask belongs to." }),
   }),
-  outputSchema: z.object({
-    taskId: z.string().optional(),
-    subTaskId: z.string().optional(),
-    error: z.string().optional(),
-  }),
-  execute: async ({ title, description, taskId }) => {
+  execute: async (_toolCallId, params) => {
     // Validate the task exists so we never create an orphaned subtask.
-    const task = crud.getTask(taskId);
+    const task = crud.getTask(params.taskId);
     if (!task) {
-      return {
-        error: `task ${taskId} does not exist`,
-      };
+      return toPiContent({ error: `task ${params.taskId} does not exist` });
     }
     try {
       const subtask = await crud.createSubtask({
-        title,
-        description,
-        taskId,
+        title: params.title,
+        description: params.description,
+        taskId: params.taskId,
       });
 
-      return { taskId, subTaskId: subtask.id };
-    } catch (e: any) {
-      return {
-        error: `${e.message}`,
-      };
+      return toPiContent({ taskId: params.taskId, subTaskId: subtask.id });
+    } catch (e: unknown) {
+      return toPiContent({ error: (e as Error).message });
     }
   },
 });
 
-export const updateSubtaskWorkerTool = tool({
+export const updateSubtaskWorkerTool = defineTool({
+  label: "update_subtask_worker",
+  name: "Update Subtask (worker)",
   description:
     "Update a subtask's status and notes in one call. Use to reflect daily work: 'todo' | 'in-progress' | 'done'. Empty notes clears the notes.",
-  inputSchema: z.object({
-    subtaskId: z.string().describe("Subtask id to update."),
-    status: z
-      .enum(TASK_STATUSES)
-      .describe("New status: 'todo' | 'in-progress' | 'done'."),
-    notes: z
-      .string()
-      .describe("New notes text. Empty string clears the notes."),
+  parameters: Type.Object({
+    subtaskId: Type.String({ description: "Subtask id to update." }),
+    status: Type.Enum(TASK_STATUSES, {
+      description: "New status: 'todo' | 'in-progress' | 'done'.",
+    }),
+    notes: Type.String({
+      description: "New notes text. Empty string clears the notes.",
+    }),
   }),
-  outputSchema: z.object({
-    error: z.string().nullable,
-  }),
-  execute: async ({ subtaskId, status, notes }) => {
+  execute: async (_toolCallId, params) => {
     try {
       // empty-string notes = "no notes", so it does not overwrite the existing
       // handoff notes (which would otherwise make the manager's handoff prompt
       // dead and strand the worker on the same subtask forever).
-      const changes = { status };
-      if (notes && notes !== "") changes["notes"] = notes;
+      const changes = { status: params.status };
+      if (params.notes && params.notes !== "") changes["notes"] = params.notes;
 
-      await crud.updateSubtask(subtaskId, changes);
-      return { error: null };
+      await crud.updateSubtask(params.subtaskId, changes);
+      return toPiContent({ error: null });
     } catch (e) {
-      return { error: (e as Error).message };
+      return toPiContent({ error: (e as Error).message }, true);
     }
   },
 });
 
-export const updateSubtaskManagerTool = tool({
+export const updateSubtaskManagerTool = defineTool({
+  label: "update_subtask_manager",
+  name: "Update Subtask (manager)",
   description:
     "Update a subtask's status and notes in one call. Use to reflect daily work: 'todo' | 'in-progress' | 'done'. Empty notes clears the notes.",
-  inputSchema: z.object({
-    subtaskId: z.string().describe("Subtask id to update."),
-    status: z
-      .enum(TASK_STATUSES)
-      .describe("New status: 'todo' | 'in-progress' | 'done'."),
-    title: z.string(),
-    description: z.string(),
+  parameters: Type.Object({
+    subtaskId: Type.String({ description: "Subtask id to update." }),
+    status: Type.Enum(TASK_STATUSES, {
+      description: "New status: 'todo' | 'in-progress' | 'done'.",
+    }),
+    title: Type.String({ description: "New title text." }),
+    description: Type.String({ description: "New description text." }),
   }),
-  outputSchema: z.object({
-    error: z.string().nullable,
-  }),
-  execute: async ({ subtaskId, status, title, description }) => {
+  execute: async (_toolCallId, params) => {
     try {
       const changes = {
-        status: status,
-        title: title,
-        description: description,
+        status: params.status,
+        title: params.title,
+        description: params.description,
       };
 
-      await crud.updateSubtask(subtaskId, changes);
-      return { error: null };
+      await crud.updateSubtask(params.subtaskId, changes);
+      return toPiContent({ error: null });
     } catch (e) {
-      return { error: (e as Error).message };
+      return toPiContent({ error: (e as Error).message }, true);
     }
   },
 });

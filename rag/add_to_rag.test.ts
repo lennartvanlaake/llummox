@@ -1,5 +1,5 @@
 import { test, expect, beforeAll, beforeEach } from "bun:test";
-import { setupDatabase, db } from "./db";
+import { setupDatabase } from "./db";
 import { addFileToRag, addDirectoryToRag } from "./add_to_rag";
 import { searchRag } from "./search";
 import { mkdtemp, writeFile } from "fs/promises";
@@ -8,18 +8,21 @@ import { join } from "path";
 
 const DB_PATH = ":memory:";
 
-let db;
+let testDb;
 
 beforeAll(() => {
-  db = setupDatabase(DB_PATH);
+  testDb = setupDatabase(DB_PATH);
 });
+
+// ponytail: `db` is exported from ./db for real runs; tests use `testDb`
+// to avoid the local variable colliding with the imported name.
 
 beforeEach(() => {
   // Each add/search test writes its own docs rows; clear them so KNN doesn't
   // mix unrelated docs and rank the wrong row first.
-  db.query("DELETE FROM vec_doc_chunks").run();
-  db.query("DELETE FROM doc_chunks").run();
-  db.query("DELETE FROM docs").run();
+  testDb.query("DELETE FROM vec_doc_chunks").run();
+  testDb.query("DELETE FROM doc_chunks").run();
+  testDb.query("DELETE FROM docs").run();
 });
 
 test("addFileToRag → searchRag: add a file, then find it back by meaning", async () => {
@@ -30,7 +33,7 @@ test("addFileToRag → searchRag: add a file, then find it back by meaning", asy
   await writeFile(file, content);
 
   // The real pipeline: addFileToRag reads the file, embedDocument stores it.
-  await addFileToRag(file);
+  await addFileToRag(file, "text", "general");
 
   // Search should surface the tea doc (paraphrased query), not random noise.
   const results = await searchRag(
@@ -39,7 +42,7 @@ test("addFileToRag → searchRag: add a file, then find it back by meaning", asy
   );
 
   expect(results.length).toBeGreaterThan(0);
-  const top = results[0];
+  const top = results[0]!;
   expect(top.source).toContain("tea");
   expect(top.content.toLowerCase()).toContain("tea");
 });
@@ -59,7 +62,7 @@ test("addDirectoryToRag indexes every file; search finds each topic", async () =
     "Bread is a baked food made from flour and water.",
   );
 
-  await addDirectoryToRag(dir);
+  await addDirectoryToRag(dir, "text", "general");
 
   const catResults = await searchRag("a furry house pet that purrs", 5);
   const rocketResults = await searchRag("a vehicle that reaches space", 5);

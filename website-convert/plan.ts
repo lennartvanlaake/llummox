@@ -2,7 +2,6 @@ import { getTree } from "../shared/scout/functions";
 import type { MainStateType } from ".";
 import {
   createPiWorkerAgent,
-  createWorkerAgent,
   type TaskConfig,
   workOnPlan,
 } from "../todos/agents";
@@ -18,7 +17,6 @@ export async function plan(state: MainStateType) {
   const tree = JSON.stringify(await getTree(state.originDir));
 
   const tools = {
-    ls,
     simplifyHtml,
     searchHtml,
     readLines,
@@ -27,7 +25,7 @@ export async function plan(state: MainStateType) {
 
   const scoutConfig: TaskConfig = {
     cwd: state.originDir,
-    worker: createWorkerAgent({
+    worker: createPiWorkerAgent({
       extraTools: tools,
       systemPromptAppend: `The directory tree looks like this: ${tree}. Your work is to report and analyse HTML files. Avoid reading the files fully, prefer simplifyHtml and searchHtml. Report goes into the "notes" of the subtask`,
     }),

@@ -17,7 +17,7 @@ describe("scrum task tools", () => {
   });
 
   test("update_task updates status and notes (prompt is static, set out of band)", async () => {
-    const task = await createTask({ prompt: "T", description: "d" });
+    const task = await createTask({ prompt: "T" });
     const taskId = task.id;
 
     const res = (await testInvokeTool(updateTaskTool, {
@@ -25,7 +25,7 @@ describe("scrum task tools", () => {
       status: "done",
       notes: "needs design review",
     })) as any;
-    expect(res.error).toBeUndefined();
+    expect(res.isError).toBe(false);
 
     const fetched = getTask(taskId)!;
     expect(fetched.prompt).toBe("T");
@@ -36,7 +36,6 @@ describe("scrum task tools", () => {
   test("update_task clears notes given empty string", async () => {
     const task = await createTask({
       prompt: "T",
-      description: "d",
       notes: "x",
     });
     const taskId = task.id;
@@ -45,7 +44,7 @@ describe("scrum task tools", () => {
       taskId,
       notes: "",
     })) as any;
-    expect(res.error).toBeUndefined();
+    expect(res.isError).toBe(false);
 
     const fetched = getTask(taskId)!;
     expect(fetched.notes).toBe("");
@@ -58,7 +57,8 @@ describe("scrum task tools", () => {
       status: "done",
       notes: "x",
     })) as any;
-    expect(res.error).toContain("nope");
+    expect(res.isError).toBe(true);
+    expect(res.content[0].text).toContain("nope");
   });
 });
 
@@ -67,7 +67,7 @@ describe("scrum subtask tools", () => {
 
   beforeAll(async () => {
     setupDatabase(":memory:");
-    const task = await createTask({ prompt: "T", description: "d" });
+    const task = await createTask({ prompt: "T" });
     taskId = task.id;
   });
 
@@ -77,8 +77,8 @@ describe("scrum subtask tools", () => {
       description: "Draft the meeting agenda",
       taskId,
     })) as any;
-    expect(made.subTaskId).toBeTruthy();
-    const subtaskId: string = made.subTaskId;
+    expect(made.content[0].text).toContain("subTaskId");
+    const subtaskId: string = JSON.parse(made.content[0].text).subTaskId;
 
     // status + notes in one call (merged tool)
     const res = await testInvokeTool(updateSubtaskWorkerTool, {
@@ -86,7 +86,8 @@ describe("scrum subtask tools", () => {
       status: "done",
       notes: "wait on spec",
     });
-    expect(res.error).toBeNull();
+    expect(res.isError).toBe(false);
+    expect(res.content[0].text).toContain("error");
 
     const fetched = await db
       .select()
@@ -103,6 +104,7 @@ describe("scrum subtask tools", () => {
       status: "done",
       notes: "x",
     });
-    expect(res.error).toContain("ghost");
+    expect(res.isError).toBe(true);
+    expect(res.content[0].text).toContain("ghost");
   });
 });

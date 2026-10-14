@@ -56,7 +56,7 @@ export function createManagerAgent(options: PiAgentOptions = defaultPiOptions) {
 
 // TODO edit extensions
 export function createSummarizerAgent(
-  options: PiAgentOptions = defaultPiOptios,
+  options: PiAgentOptions = defaultPiOptions,
 ) {
   return createPiSession({
     cwd: options.cwd,
@@ -74,17 +74,14 @@ export async function createTaskWithSubs(
   const agent = taskConfig?.manager ?? (await createManagerAgent());
   const prompt = `${taskConfig.prompt} ${previousTask ? `. The notes from the previous task with prompt ${previousTask!.prompt} are ${previousTask!.notes}. ` : ""}The taskId which you use for creating subtasks is "${task.id}"`;
 
-  await agent.prompt({
-    prompt,
-  });
+  await agent.prompt(prompt);
 
   // double check that subtasks are actually generated
   if (getSubtasks(task.id).length == 0) {
-    await agent.prompt({
-      prompt:
-        prompt +
+    await agent.prompt(
+      prompt +
         "EXTREMELY IMPORTANT: You need to call the createSubtask tool to create subtasks",
-    });
+    );
   }
   return task;
 }
@@ -119,9 +116,9 @@ async function summarize(task: TasksRow) {
     .map((it) => `Title: ${it.title}. Notes: ${it.notes}\n`)
     .join("");
 
-  await agent.prompt({
-    prompt: `Summarize task with id ${task.id} and prompt ${task.prompt}. Subtasks: ${subtasksTemplate}`,
-  });
+  await agent.prompt(
+    `Summarize task with id ${task.id} and prompt ${task.prompt}. Subtasks: ${subtasksTemplate}`,
+  );
 
   return getTask(task.id);
 }
