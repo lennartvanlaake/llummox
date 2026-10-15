@@ -44,7 +44,7 @@ export async function invokeTool(
     controller.signal,
     opts.onUpdate,
     mockContext(),
-  ) as unknown as AgentToolResult); // SAFETY: execute returns the tool's own result shape; the cast only surfaces the generic TDetails the caller opted into.
+  ) as unknown as AgentToolResult);
 
   if (controller.signal.aborted) {
     return toTestToolResult(toPiContent("Aborted.", true))

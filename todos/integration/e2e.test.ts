@@ -3,8 +3,6 @@ import { setupDatabase } from "../db";
 import {
   createPiWorkerAgent,
   workOnPlan,
-  workOnTask,
-  workerSystemPrompt,
 } from "../agents";
 import { listSubtasks, listTasks } from "../crud.ts";
 // ponytail: `ai`/`@ai-sdk` removed — telemetry registration dropped from tests.
@@ -32,5 +30,8 @@ describe("Test the todo worker agent", () => {
     expect(all.length).toBeGreaterThan(0);
     const subtasks = listSubtasks(all[0]!.id);
     expect(subtasks.length).toBeGreaterThan(0);
+    subtasks.forEach((st) => {
+      expect(st.status).toBe("done")
+    })
   }, 0);
 });

@@ -13,12 +13,13 @@ import {
 import { logger } from "../shared/utils.ts";
 import { TaskStatus } from "./constants.ts";
 import type { SubtasksRow, TasksRow } from "./schema.ts";
-import type { AgentSession } from "@earendil-works/pi-coding-agent";
+import type { AgentSession, ToolDefinition } from "@earendil-works/pi-coding-agent";
 import { createPiSession } from "../shared/pi.ts";
 
 type PiAgentOptions = {
   cwd: string;
   systemPromptAppend?: string;
+  tools?: ToolDefinition[];
 };
 export type TaskConfig = {
   cwd: string;
@@ -40,7 +41,7 @@ export function createPiWorkerAgent(
 ) {
   return createPiSession({
     cwd: options.cwd,
-    extensionPaths: [`${import.meta.dir}/todosPiExtension.ts`],
+    tools: [updateSubtaskWorkerTool, ...(options?.tools ?? [])],
     systemPrompt: `${workerSystemPrompt} ${options.systemPromptAppend ?? ""}`,
   });
 }
@@ -49,7 +50,7 @@ export function createPiWorkerAgent(
 export function createManagerAgent(options: PiAgentOptions = defaultPiOptions) {
   return createPiSession({
     cwd: options.cwd,
-    // extensionPaths: [`${import.meta.dir}/llummoxPiExtension.ts`],
+    tools: [createSubtaskTool, ...(options?.tools ?? [])],
     systemPrompt: `${managerSystemPrompt} ${options.systemPromptAppend ?? ""}`,
   });
 }
@@ -60,7 +61,7 @@ export function createSummarizerAgent(
 ) {
   return createPiSession({
     cwd: options.cwd,
-    // extensionPaths: [`${import.meta.dir}/llummoxPiExtension.ts`],
+    tools: [updateTaskTool, ...(options?.tools ?? [])],
     systemPrompt: `${summarizerSystemPrompt} ${options.systemPromptAppend ?? ""}`,
   });
 }
@@ -80,7 +81,7 @@ export async function createTaskWithSubs(
   if (getSubtasks(task.id).length == 0) {
     await agent.prompt(
       prompt +
-        "EXTREMELY IMPORTANT: You need to call the createSubtask tool to create subtasks",
+      "EXTREMELY IMPORTANT: You need to call the createSubtask tool to create subtasks",
     );
   }
   return task;
@@ -110,7 +111,7 @@ export async function doWork(
 }
 
 async function summarize(task: TasksRow) {
-  const agent = createSummarizerAgent();
+  const agent = await createSummarizerAgent();
   const subtasks = getSubtasks(task.id);
   const subtasksTemplate = subtasks
     .map((it) => `Title: ${it.title}. Notes: ${it.notes}\n`)
@@ -145,12 +146,10 @@ export async function workOnTask(
   while (subtask) {
     logger.info(subtask);
     try {
-      // TODO sort this out
       await doWork(
         task,
         subtask,
-        // ts is being weird here, idk
-        taskConfig?.worker,
+        taskConfig.worker,
       );
     } catch (e) {
       logger.error(e);

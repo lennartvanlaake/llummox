@@ -2,7 +2,7 @@ import {
   createAgentSession,
   DefaultResourceLoader,
   ModelRuntime,
-  type ResourceLoader,
+  type ToolDefinition,
 } from "@earendil-works/pi-coding-agent";
 import { logger } from "../shared/utils";
 
@@ -10,7 +10,8 @@ export type PiSessionConfig = {
   cwd: string;
   model?: string;
   systemPrompt: string;
-  extensionPaths?: string[];
+  tools?: ToolDefinition[];
+  builtinTools?: string[];
 };
 
 export async function createPiSession(config: PiSessionConfig) {
@@ -20,25 +21,32 @@ export async function createPiSession(config: PiSessionConfig) {
     cwd: config.cwd,
     agentDir: `${import.meta.dir}/piConfig`,
     systemPromptOverride: () => config.systemPrompt ?? "",
-    additionalExtensionPaths: config?.extensionPaths ?? [],
+    extensionFactories: [
+      (pi) => {
+        for (const tool of config.tools ?? []) {
+          pi.registerTool(tool)
+        }
+      },
+    ],
   });
 
   await fileBasedResourceLoader.reload();
 
-  // pick and choose from file-based thingie
-  const resourceLoader: ResourceLoader = {
-    getExtensions: () => fileBasedResourceLoader.getExtensions(),
-    getSkills: () => ({ skills: [], diagnostics: [] }),
-    getPrompts: () => ({ prompts: [], diagnostics: [] }),
-    getThemes: () => ({ themes: [], diagnostics: [] }),
-    getAgentsFiles: () => ({ agentsFiles: [] }),
-    getSystemPrompt: () => config.systemPrompt ?? "",
-    getSystemPromptSource: () => undefined,
-    getAppendSystemPrompt: () => [],
-    getAppendSystemPromptSources: () => [],
-    extendResources: () => {},
-    reload: async () => {},
-  };
+  fileBasedResourceLoader.getSystemPrompt = () => config.systemPrompt ?? "";
+  // //pick and choose from file-based thingie
+  // const resourceLoader: ResourceLoader = {
+  //   getExtensions: () => fileBasedResourceLoader.getExtensions(),
+  //   getSkills: () => ({ skills: [], diagnostics: [] }),
+  //   getPrompts: () => ({ prompts: [], diagnostics: [] }),
+  //   getThemes: () => ({ themes: [], diagnostics: [] }),
+  //   getAgentsFiles: () => ({ agentsFiles: [] }),
+  //   getSystemPrompt: () => config.systemPrompt ?? "",
+  //   getSystemPromptSource: () => undefined,
+  //   getAppendSystemPrompt: () => [],
+  //   getAppendSystemPromptSources: () => [],
+  //   extendResources: () => { },
+  //   reload: async () => { },
+  // };
 
   modelRuntime.registerProvider("local", {
     api: "openai-completions",
@@ -73,13 +81,20 @@ export async function createPiSession(config: PiSessionConfig) {
 
   const { session } = await createAgentSession({
     modelRuntime,
-    resourceLoader,
+    resourceLoader: fileBasedResourceLoader,
+    tools: (config.builtinTools ?? []).concat(config?.tools?.map(t => t.name) ?? []),
   });
   session.subscribe((e) => {
+    if (e.type == "tool_execution_start") {
+      logger.info(`Tool call ${e.toolName} with args ${e.args}`)
+    }
+
     if (e.type == "message_end" && e.message.role != "system") {
       const message = e.message as any;
       logger.info(`${message.role}: ${message.content[0]?.text}`);
     }
+
+
   });
   return session;
 }

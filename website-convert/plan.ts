@@ -7,7 +7,6 @@ import {
 } from "../todos/agents";
 import {
   grepRecursive,
-  ls,
   readLines,
   searchHtml,
   simplifyHtml,
@@ -16,17 +15,18 @@ import {
 export async function plan(state: MainStateType) {
   const tree = JSON.stringify(await getTree(state.originDir));
 
-  const tools = {
+  const tools = [
     simplifyHtml,
     searchHtml,
     readLines,
     grepRecursive,
-  };
+  ]
 
   const scoutConfig: TaskConfig = {
     cwd: state.originDir,
-    worker: createPiWorkerAgent({
-      extraTools: tools,
+    worker: await createPiWorkerAgent({
+      cwd: state.originDir,
+      tools,
       systemPromptAppend: `The directory tree looks like this: ${tree}. Your work is to report and analyse HTML files. Avoid reading the files fully, prefer simplifyHtml and searchHtml. Report goes into the "notes" of the subtask`,
     }),
 
