@@ -8,12 +8,36 @@ import {
   updateSubtaskWorkerTool,
 } from "./tools";
 import { createTask, getTask, getSubtask } from "./crud";
-import { testInvokeTool } from "../shared/toolTester";
 import { logger } from "../shared/utils";
 
 describe("scrum task tools", () => {
   beforeAll(async () => {
     setupDatabase(":memory:");
+  });
+
+
+  //  // OLD
+  // test("update_task errors on a missing task", async () => {
+  //   // Required status present so zod passes; the missing-task check fires.
+  //   const res = (await testInvokeTool(updateTaskTool, {
+  //     taskId: "nope",
+  //     status: "done",
+  //     notes: "x",
+  //   })) as any;
+  //   expect(res.isError).toBe(true);
+  //   expect(res.content[0].text).toContain("nope");
+  // });
+  //
+  // NEW
+  //
+  test("update_task errors on a missing task", async () => {
+    const res = await updateTaskTool.execute("_", {
+      taskId: "nope",
+      status: "done",
+      notes: "x",
+    }, undefined, undefined, undefined)
+    expect(res.isError).toBe(true);
+    expect(res.content[0].text).toContain("nope");
   });
 
   test("update_task updates status and notes (prompt is static, set out of band)", async () => {
@@ -50,16 +74,6 @@ describe("scrum task tools", () => {
     expect(fetched.notes).toBe("");
   });
 
-  test("update_task errors on a missing task", async () => {
-    // Required status present so zod passes; the missing-task check fires.
-    const res = (await testInvokeTool(updateTaskTool, {
-      taskId: "nope",
-      status: "done",
-      notes: "x",
-    })) as any;
-    expect(res.isError).toBe(true);
-    expect(res.content[0].text).toContain("nope");
-  });
 });
 
 describe("scrum subtask tools", () => {

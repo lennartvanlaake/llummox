@@ -8,6 +8,9 @@ export function toPiContent(content: any, isError = false): AgentToolResult {
 	if (!content) {
 		return renderContentTemplate("", isError);
 	}
+	if (typeof content === "string" || typeof content == "number") {
+		return renderContentTemplate(content.toString())
+	}
 	return renderContentTemplate(JSON.stringify(content), isError);
 }
 

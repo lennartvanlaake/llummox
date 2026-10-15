@@ -1,90 +1,94 @@
-import z from "zod/v4";
 import { $ } from "bun";
 import { sandboxCommand } from "../../sandbox/sandbox";
-// ponytail: `tool()` from `ai` removed (no local AI SDK dependency). The tools
-// are plain objects with an `execute` fn, consumed via shared/toolTester.
+import { defineTool } from "@earendil-works/pi-coding-agent";
+import { Type } from "@earendil-works/pi-ai";
+import { toPiContent } from "../utils";
 
-export const wc = {
+
+export const wc = defineTool({
   description: "Wraps the `wc` command line tool. Gives a word/line/char count",
-  inputSchema: z.object({
-    file: z.string().describe("File to get wc for"),
-    type: z
-      .literal(["c", "m", "l", "w"])
-      .describe(
+  name: "wc",
+  label: "wc",
+  parameters: Type.Object({
+    file: Type.String({ description: "File to get wc for" }),
+    type: Type.Enum(["c", "m", "l", "w"], {
+      description:
         "Modifier for wc command. c for bytes, m for chars, l for lines, w for words",
-      ),
+    }),
   }),
-  execute: async ({ file, type }) => {
-    return (await $`wc -${type} ${file}`).text();
+  execute: async (_, params) => {
+    return toPiContent((await $`wc -${params.type} ${params.file}`).text());
   },
-};
+});
 
-export const ls = {
-  description: "Lists the contents of a directory",
-  inputSchema: z.object({
-    path: z.string().describe("Directory to list"),
-  }),
-  execute: async ({ path }) => {
-    return (await $`ls -la ${path}`).text();
-  },
-};
-
-export const grepRecursive = {
+export const grepRecursive = defineTool({
   description: "Recursively searches for a pattern in a directory",
-  inputSchema: z.object({
-    path: z.string().describe("Directory or file to search"),
-    pattern: z.string().describe("Pattern to search for"),
+  name: "grep_recursive",
+  label: "grepRecursive",
+  parameters: Type.Object({
+    path: Type.String({ description: "Directory or file to search" }),
+    pattern: Type.String({ description: "Pattern to search for" }),
   }),
-  execute: async ({ path, pattern }: { path: string; pattern: string }) => {
-    const out = (await $`grep -R -n ${pattern} ${path}`).text();
-    return out.trim() ? out : "No matches found";
+  execute: async (_, params) => {
+    try {
+      const out = (await $`grep -R -n ${params.pattern} ${params.path}`).text();
+      return toPiContent(out.trim() ? out : "No matches found", false);
+    } catch (e) {
+      return toPiContent("No matches found", false);
+    }
   },
-};
+});
 
-export const simplifyHtml = {
+export const simplifyHtml = defineTool({
   description:
     "Returns a vastly simplified version of the html in the body of the file. Keeps headers and text, strips everything else",
-  inputSchema: z.object({
-    path: z.string().describe("HTML file"),
+  name: "simplify_html",
+  label: "simplifyHtml",
+  parameters: Type.Object({
+    path: Type.String({ description: "HTML file" }),
   }),
-  execute: async ({ path }: { path: string }) => {
-    return (await $`cat ${path} | trafilura --html`).text();
+  execute: async (_, params) => {
+    return toPiContent(await $`cat ${params.path} | trafilatura --html`.text());
   },
-};
+});
 
-export const searchHtml = {
+export const searchHtml = defineTool({
   description:
     "Returns the content of an element or set of elements in the html body selected by a CSS query",
-  inputSchema: z.object({
-    path: z.string().describe("HTML file"),
-    query: z
-      .string()
-      .describe(
+  name: "search_html",
+  label: "searchHtml",
+  parameters: Type.Object({
+    path: Type.String({ description: "HTML file" }),
+    query: Type.String({
+      description:
         "CSS query for the element ('nav' to get the contents of nav element, '.someclass' for elements with class='someclass' )",
-      ),
+    }),
   }),
-  execute: async ({ path, query }: { path: string; query: string }) => {
-    return (await $`cat ${path} | pup '${query}'`).text();
+  execute: async (_, params) => {
+    return toPiContent(await $`cat ${params.path} | pup '${params.query}'`.text());
   },
-};
+});
 
-export const readLines = {
+export const readLines = defineTool({
   description: "Reads specified lines from a file",
-  inputSchema: z.object({
-    file: z.string(),
-    startLine: z.number(),
-    numberOfLines: z.number().describe("Number of lines to read. Max 100"),
+  name: "read_lines",
+  label: "readLines",
+  parameters: Type.Object({
+    file: Type.String(),
+    startLine: Type.Number(),
+    numberOfLines: Type.Number({
+      description: "Number of lines to read. Max 100",
+    }),
   }),
-  execute: async ({ file, startLine, numberOfLines }: {
-    file: string;
-    startLine: number;
-    numberOfLines: number;
-  }) => {
-    if (numberOfLines > 100) {
-      return "ERROR: numberOfLines cannot be higher than 100";
+  execute: async (_, params) => {
+    if (params.numberOfLines > 100) {
+      return toPiContent(
+        "ERROR: numberOfLines cannot be higher than 100",
+        true,
+      );
     }
-    return (
-      await $`sed -n ${startLine},${startLine + numberOfLines}p ${file}`
-    ).text();
+    return toPiContent(
+      await $`sed -n ${params.startLine},${params.startLine + params.numberOfLines}p ${params.file}`.text(),
+    );
   },
-};
+});

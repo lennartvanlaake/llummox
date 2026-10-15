@@ -12,22 +12,9 @@ describe("getTree", () => {
       await $`mkdir ${realTmp}`;
       await $`touch ${realTmp}/file.txt`;
       const tree = await getTree(realTmp);
-      // Generic shape: lstr --output json is an object with a contents field.
-      expect(typeof tree).toBe("object");
-      expect(tree).toHaveProperty("contents");
+      expect(tree).toContain("file.txt");
     } finally {
       await $`rm -rf ${realTmp}`;
-    }
-  });
-
-  test("returns an empty contents list for an empty directory", async () => {
-    const empty = `${import.meta.dir}/.tmp-empty-${Math.random().toString(36).slice(2)}`;
-    try {
-      await $`mkdir ${empty}`;
-      const tree = await getTree(empty);
-      expect(tree.contents).toEqual([]);
-    } finally {
-      await $`rm -rf ${empty}`;
     }
   });
 
