@@ -7,49 +7,35 @@ import {
   createSubtaskTool,
   updateSubtaskWorkerTool,
 } from "./tools";
-import { createTask, getTask, getSubtask } from "./crud";
+import { createTask, getTask } from "./crud";
 import { logger } from "../shared/utils";
+import { invokeTool } from "../shared/testing";
 
 describe("scrum task tools", () => {
   beforeAll(async () => {
     setupDatabase(":memory:");
   });
 
-
-  //  // OLD
-  // test("update_task errors on a missing task", async () => {
-  //   // Required status present so zod passes; the missing-task check fires.
-  //   const res = (await testInvokeTool(updateTaskTool, {
-  //     taskId: "nope",
-  //     status: "done",
-  //     notes: "x",
-  //   })) as any;
-  //   expect(res.isError).toBe(true);
-  //   expect(res.content[0].text).toContain("nope");
-  // });
-  //
-  // NEW
-  //
   test("update_task errors on a missing task", async () => {
-    const res = await updateTaskTool.execute("_", {
+    const res = await invokeTool(updateTaskTool, {
       taskId: "nope",
       status: "done",
       notes: "x",
-    }, undefined, undefined, undefined)
-    expect(res.isError).toBe(true);
-    expect(res.content[0].text).toContain("nope");
+    });
+    expect(res.result.isError).toBe(true);
+    expect(res.text).toContain("nope");
   });
 
   test("update_task updates status and notes (prompt is static, set out of band)", async () => {
     const task = await createTask({ prompt: "T" });
     const taskId = task.id;
 
-    const res = (await testInvokeTool(updateTaskTool, {
+    const res = await invokeTool(updateTaskTool, {
       taskId,
       status: "done",
       notes: "needs design review",
-    })) as any;
-    expect(res.isError).toBe(false);
+    });
+    expect(res.result.isError).toBe(false);
 
     const fetched = getTask(taskId)!;
     expect(fetched.prompt).toBe("T");
@@ -64,16 +50,15 @@ describe("scrum task tools", () => {
     });
     const taskId = task.id;
 
-    const res = (await testInvokeTool(updateTaskTool, {
+    const res = await invokeTool(updateTaskTool, {
       taskId,
       notes: "",
-    })) as any;
-    expect(res.isError).toBe(false);
+    });
+    expect(res.result.isError).toBe(false);
 
     const fetched = getTask(taskId)!;
     expect(fetched.notes).toBe("");
   });
-
 });
 
 describe("scrum subtask tools", () => {
@@ -86,22 +71,22 @@ describe("scrum subtask tools", () => {
   });
 
   test("create_subtask then update_subtask sets status + notes together", async () => {
-    const made = (await testInvokeTool(createSubtaskTool, {
+    const made = (await invokeTool(createSubtaskTool, {
       title: "Write agenda",
       description: "Draft the meeting agenda",
       taskId,
     })) as any;
-    expect(made.content[0].text).toContain("subTaskId");
-    const subtaskId: string = JSON.parse(made.content[0].text).subTaskId;
+    expect(made.text).toContain("subTaskId");
+    const subtaskId: string = JSON.parse(made.text).subTaskId;
 
     // status + notes in one call (merged tool)
-    const res = await testInvokeTool(updateSubtaskWorkerTool, {
+    const res = await invokeTool(updateSubtaskWorkerTool, {
       subtaskId,
       status: "done",
       notes: "wait on spec",
     });
-    expect(res.isError).toBe(false);
-    expect(res.content[0].text).toContain("error");
+    expect(res.result.isError).toBe(false);
+    expect(res.text).toContain("error");
 
     const fetched = await db
       .select()
@@ -113,12 +98,12 @@ describe("scrum subtask tools", () => {
   });
 
   test("update_subtask errors on a missing subtask", async () => {
-    const res = await testInvokeTool(updateSubtaskWorkerTool, {
+    const res = await invokeTool(updateSubtaskWorkerTool, {
       subtaskId: "ghost",
       status: "done",
       notes: "x",
     });
-    expect(res.isError).toBe(true);
-    expect(res.content[0].text).toContain("ghost");
+    expect(res.result.isError).toBe(true);
+    expect(res.text).toContain("ghost");
   });
 });

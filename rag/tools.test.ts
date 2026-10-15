@@ -8,6 +8,7 @@ import {
   db,
 } from "./db";
 import { embed } from "./embed";
+import { invokeTool } from "../shared/testing";
 
 // searchTool.execute returns AgentToolResult (content: [{type,text}]);
 // no local toPiContent import needed here.
@@ -17,16 +18,10 @@ beforeEach(() => setupDatabase(":memory:"));
 test("search tool returns a tool result", async () => {
   seedCorpus();
 
-  const res = (await searchTool.execute(
-    "tool-call-1",
-    { query: "dog pet animal" },
-    new AbortController().signal,
-  )) as any;
-  expect(res.error).toBeUndefined();
-  expect(res.content[0].type).toBe("text");
-
-  const text = res.content[0].text;
-  expect(text).toContain("cats");
+  const res = (await invokeTool(searchTool,
+    { query: "dog pet animal" }
+  ));
+  expect(res.text).toContain("cats");
 });
 
 // seed a corpus so the tool's vec0 search has rows to rank (mirrors search.test.ts).

@@ -1,7 +1,6 @@
 import { test, expect, describe } from "bun:test";
 import {
   wc,
-  ls,
   grepRecursive,
   simplifyHtml,
   searchHtml,
