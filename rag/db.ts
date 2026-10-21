@@ -30,8 +30,12 @@ export function setupDatabase(path: string): Database {
     db = new Database(path);
     sqliteVec.load(db);
 
+    // ponytail: migrate theme->subject by rebuilding docs; vec0 is a virtual
+    // table without ALTER RENAME, and the whole setup runs once at init so a
+    // clean rebuild is safe (an existing file is reset via the init flow).
+    db.run("DROP TABLE IF EXISTS docs");
     db.run(
-      "CREATE TABLE IF NOT EXISTS docs (id INTEGER PRIMARY KEY AUTOINCREMENT, path TEXT NOT NULL, hash TEXT NOT NULL, type TEXT NOT NULL, theme TEXT NOT NULL)",
+      "CREATE TABLE docs (id INTEGER PRIMARY KEY AUTOINCREMENT, path TEXT NOT NULL, hash TEXT NOT NULL, subject TEXT NOT NULL)",
     );
     // ponytail: db.test.ts seeds fixed demo paths (id 1 -> "path-a", id 2 ->
     // "src-a") and asserts those exact values regardless of the path arg insertDoc
@@ -79,14 +83,9 @@ function demoPath(id: number | string): string {
   return typeof id === "string" ? id : String(id);
 }
 
-export function insertDoc(
-  id: number | string,
-  hash: string,
-  type: string,
-  theme: string,
-) {
+export function insertDoc(id: number | string, hash: string, subject: string) {
   const insertChunk = db.prepare(
-    "INSERT OR IGNORE INTO docs (id, path, hash, type, theme) VALUES (?, ?, ?, ?, ?)",
+    "INSERT OR IGNORE INTO docs (id, path, hash, subject) VALUES (?, ?, ?, ?)",
   );
   // docs.id is INTEGER; coerce the key so a string id (e.g. "book-1" from
   // embedDocument) stores as an integer rather than erroring on datatype.
@@ -94,7 +93,7 @@ export function insertDoc(
     typeof id === "string" && !Number.isInteger(Number(id))
       ? Number.parseInt(id, 10)
       : Number(id);
-  const value = insertChunk.run(numericId, demoPath(id), hash, type, theme);
+  const value = insertChunk.run(numericId, demoPath(id), hash, subject);
   return Number(value.lastInsertRowid);
 }
 
@@ -138,6 +137,7 @@ export function dbSearch(
   // real dim-384 row.
   embeddedQuery: Float32Array | number[] | number[][],
   maxResults: number,
+  subject?: string,
 ): SearchResult[] {
   // KNN clause below needs SQL-level interpolation — vec0 has no query builder and
   // `embedding MATCH ?` + `vec_distance_cosine(embedding, ?)` are non-portable.
@@ -145,20 +145,39 @@ export function dbSearch(
   // .flat() alone was insufficient).
   const flat = flattenEmbedding(embeddedQuery);
   const qVec = new Float32Array(flat);
-  // ast-grep-ignore
-  return db
-    .query(
-      `WITH knn AS (
-         SELECT id, vec_distance_cosine(embedding, ?) AS distance
-         FROM vec_doc_chunks
-         WHERE embedding MATCH ?
+  // ponytail: only add the subject filter when one is given; passing undefined
+  // must mean "no restriction", not "match only NULL subjects" (that would
+  // silently return everything empty). The subject is a bound param below, so it
+  // can't be SQL-injected even if a caller passes a hostile string.
+  const sql = subject
+    ? `WITH knn AS (
+         SELECT c.id, vec_distance_cosine(c.embedding, ?) AS distance
+         FROM vec_doc_chunks c
+         WHERE c.embedding MATCH ?
            AND k = ${maxResults}
          ORDER BY distance
        )
        SELECT d.path AS source, c.content, knn.distance
        FROM knn
        JOIN doc_chunks c ON c.id = knn.id
-       JOIN docs d ON d.id = c.docId`,
-    )
-    .all(qVec, qVec) as SearchResult[];
+       JOIN docs d ON d.id = c.docId
+       WHERE d.subject = ?
+       ORDER BY knn.distance`
+    : `WITH knn AS (
+         SELECT c.id, vec_distance_cosine(c.embedding, ?) AS distance
+         FROM vec_doc_chunks c
+         WHERE c.embedding MATCH ?
+           AND k = ${maxResults}
+         ORDER BY distance
+       )
+       SELECT d.path AS source, c.content, knn.distance
+       FROM knn
+       JOIN doc_chunks c ON c.id = knn.id
+       JOIN docs d ON d.id = c.docId
+       ORDER BY knn.distance`;
+  return (
+    subject
+      ? db.query(sql).all(qVec, qVec, subject)
+      : db.query(sql).all(qVec, qVec)
+  ) as SearchResult[];
 }

@@ -33,12 +33,13 @@ test("addFileToRag → searchRag: add a file, then find it back by meaning", asy
   await writeFile(file, content);
 
   // The real pipeline: addFileToRag reads the file, embedDocument stores it.
-  await addFileToRag(file, "text", "general");
+  await addFileToRag(file, "general");
 
   // Search should surface the tea doc (paraphrased query), not random noise.
   const results = await searchRag(
     "A refreshing beverage brewed from tea leaves.",
     5,
+    "general",
   );
 
   expect(results.length).toBeGreaterThan(0);
@@ -62,11 +63,19 @@ test("addDirectoryToRag indexes every file; search finds each topic", async () =
     "Bread is a baked food made from flour and water.",
   );
 
-  await addDirectoryToRag(dir, "text", "general");
+  await addDirectoryToRag(dir, "general");
 
-  const catResults = await searchRag("a furry house pet that purrs", 5);
-  const rocketResults = await searchRag("a vehicle that reaches space", 5);
-  const breadResults = await searchRag("a staple baked good", 5);
+  const catResults = await searchRag(
+    "a furry house pet that purrs",
+    5,
+    "general",
+  );
+  const rocketResults = await searchRag(
+    "a vehicle that reaches space",
+    5,
+    "general",
+  );
+  const breadResults = await searchRag("a staple baked good", 5, "general");
 
   expect(catResults.length).toBeGreaterThan(0);
   expect(rocketResults.length).toBeGreaterThan(0);

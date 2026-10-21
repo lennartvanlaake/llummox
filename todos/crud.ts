@@ -1,4 +1,4 @@
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, max } from "drizzle-orm";
 import {
   tasksTable,
   subtasksTable,
@@ -68,11 +68,13 @@ export function getSubtask(subtaskId: string) {
     .where(eq(subtasksTable.id, subtaskId))
     .get();
 }
-export function getSubtasks(taskId: string) {
+
+export function listSubtasks(taskId: string): SubtasksRow[] {
   return db
     .select()
     .from(subtasksTable)
     .where(eq(subtasksTable.taskId, taskId))
+    .orderBy(subtasksTable.order)
     .all();
 }
 
@@ -82,8 +84,8 @@ export function getSubtasksAll() {
 }
 
 // ponytail: O(n) scan per update, global lock. Per-task locks if concurrency matters.
-export function recomputeTaskStatus(taskId: string) {
-  const subtasks = getSubtasks(taskId);
+export async function recomputeTaskStatus(taskId: string) {
+  const subtasks = await listSubtasks(taskId);
   if (subtasks.length === 0) {
     return TaskStatus["todo"];
   }
@@ -119,7 +121,7 @@ export function getNextSubtask(taskId: string) {
         eq(subtasksTable.taskId, taskId),
       ),
     )
-    .orderBy(desc(subtasksTable.createdAt))
+    .orderBy(subtasksTable.order)
     .limit(1)
     .get();
 
@@ -129,24 +131,22 @@ export function getNextSubtask(taskId: string) {
   return null;
 }
 
+
 export async function createSubtask(
   values: Omit<SubtasksInsert, "id" | "status">,
 ) {
-  return (
-    await db
-      .insert(subtasksTable)
-      .values({ id: randomUUIDv7(), status: TaskStatus["todo"], ...values })
-      .returning()
-  ).at(0)!;
-}
-
-export function listSubtasks(taskId: string) {
-  return db
-    .select()
-    .from(subtasksTable)
-    .where(eq(subtasksTable.taskId, taskId))
-    .orderBy(subtasksTable.id)
-    .all();
+  const lastMax = db.select({ value: max(subtasksTable.order) }).from(subtasksTable).where(eq(subtasksTable.taskId, values.taskId)).get()?.value
+  const order = lastMax === null || lastMax === undefined ? 0 : lastMax! + 1
+  const insert = await db
+    .insert(subtasksTable)
+    .values({
+      id: randomUUIDv7(),
+      status: TaskStatus["todo"],
+      order,
+      ...values
+    })
+    .returning();
+  return insert.at(0)!;
 }
 
 export async function updateSubtask(
@@ -164,7 +164,9 @@ export async function updateSubtask(
     .returning()) as SubtasksRow[];
   const parent = getTask(subtask.taskId!);
   if (parent) {
-    await updateTask(parent.id, { status: recomputeTaskStatus(parent.id) });
+    await updateTask(parent.id, {
+      status: await recomputeTaskStatus(parent.id),
+    });
   }
   return updated.at(0)!;
 }

@@ -12,10 +12,12 @@ export const updateTaskTool = defineTool({
     "Update fields of a task (story). Providing a field changes it; omit it to leave it unchanged. Empty string clears a text field.",
   parameters: Type.Object({
     taskId: Type.String({ description: "Task id to update." }),
-    status: Type.Optional(Type.String({ description: "New status. Omit to leave unchanged." })),
+    status: Type.Optional(
+      Type.String({ description: "New status. Omit to leave unchanged." }),
+    ),
     notes: Type.Optional(
-      Type.String({ description: "New notes. Omit to leave unchanged." })
-    )
+      Type.String({ description: "New notes. Omit to leave unchanged." }),
+    ),
   }),
   execute: async (_toolCallId, params) => {
     try {
@@ -47,16 +49,19 @@ export const getSubtasksTool = defineTool({
     taskId: Type.String({ description: "Task id to fetch subtasks for." }),
   }),
   outputSchema: Type.Object({
-    subtasks: Type.Array(Type.Object({
-      id: Type.String({}),
-      title: Type.String({}),
-      description: Type.String({}),
-      notes: Type.String({}),
-      status: Type.String({}),
-    })),
+    subtasks: Type.Array(
+      Type.Object({
+        id: Type.String({}),
+        title: Type.String({}),
+        description: Type.String({}),
+        notes: Type.String({}),
+        status: Type.String({}),
+        order: Type.Integer({}),
+      }),
+    ),
   }),
   execute: async (_toolCallId, params) => {
-    const subtasks = crud.getSubtasks(params.taskId);
+    const subtasks = crud.getSubtasks(params.taskId) ?? [];
     return toPiContent({
       subtasks: subtasks.map((it) => ({
         id: it.id,
@@ -64,7 +69,8 @@ export const getSubtasksTool = defineTool({
         description: it.description,
         notes: it.notes,
         status: it.status,
-      }))
+        order: it.order,
+      })),
     });
   },
 });
@@ -76,9 +82,18 @@ export const createSubtaskTool = defineTool({
   parameters: Type.Object({
     title: Type.String({ description: "Subtask title." }),
     description: Type.String({
-      description: "Details of the step. Make this clear enough to be picked up by an LLM agent.",
+      description:
+        "Details of the step. Make this clear enough to be picked up by an LLM agent.",
     }),
-    taskId: Type.String({ description: "Task id (uuid) this subtask belongs to." }),
+    taskId: Type.String({
+      description: "Task id (uuid) this subtask belongs to.",
+    }),
+    order: Type.Optional(
+      Type.Integer({
+        description:
+          "Explicit ordering. Lower = returned first by getNextSubtask. Omit to auto-assign the next sequential order.",
+      }),
+    ),
   }),
   execute: async (_toolCallId, params) => {
     // Validate the task exists so we never create an orphaned subtask.
@@ -91,9 +106,11 @@ export const createSubtaskTool = defineTool({
         title: params.title,
         description: params.description,
         taskId: params.taskId,
-      });
+        order: params.order
+      })
 
-      return toPiContent({ taskId: params.taskId, subTaskId: subtask.id });
+      debugger
+      return toPiContent({ taskId: params.taskId, subTaskId: subtask.id, order: subtask.order });
     } catch (e: unknown) {
       return toPiContent({ error: (e as Error).message });
     }

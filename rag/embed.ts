@@ -73,15 +73,18 @@ export async function embed(text: string): Promise<number[]> {
 export async function embedDocument(
   source: string,
   content: string,
-  type: string,
   subject: string,
 ) {
-  const docId = insertDoc(source, hash(content).toString(), type, subject);
+  const docId = insertDoc(source, hash(content).toString(), subject);
   const chunks = await chunk(content);
+  console.log(`Embedding ${chunks.length} chunks from ${source}`);
+  let chunkCount = 0;
   for (const c of chunks) {
     const id = insertDocChunk(docId, c.text);
     const embedding = await embed(c.text);
 
     insertDocVector(id, embedding);
+    chunkCount++;
+    console.log(`${chunkCount}/${chunks.length}`);
   }
 }

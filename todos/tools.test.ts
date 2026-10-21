@@ -78,6 +78,8 @@ describe("scrum subtask tools", () => {
     })) as any;
     expect(made.text).toContain("subTaskId");
     const subtaskId: string = JSON.parse(made.text).subTaskId;
+    // ponytail: order auto-assigned (max+1) when the tool omits it.
+    expect(made.text).toContain("order");
 
     // status + notes in one call (merged tool)
     const res = await invokeTool(updateSubtaskWorkerTool, {

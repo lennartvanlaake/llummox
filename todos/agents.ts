@@ -6,8 +6,8 @@ import {
 import {
   createTask,
   getNextSubtask,
-  getSubtasks,
   getTask,
+  listSubtasks,
   updateSubtask,
 } from "./crud.ts";
 import { logger } from "../shared/utils.ts";
@@ -78,7 +78,7 @@ export async function createTaskWithSubs(
   await agent.prompt(prompt);
 
   // double check that subtasks are actually generated
-  if (getSubtasks(task.id).length == 0) {
+  if (listSubtasks(task.id).length == 0) {
     await agent.prompt(
       prompt +
       "EXTREMELY IMPORTANT: You need to call the createSubtask tool to create subtasks",
@@ -112,7 +112,7 @@ export async function doWork(
 
 async function summarize(task: TasksRow) {
   const agent = await createSummarizerAgent();
-  const subtasks = getSubtasks(task.id);
+  const subtasks = listSubtasks(task.id);
   const subtasksTemplate = subtasks
     .map((it) => `Title: ${it.title}. Notes: ${it.notes}\n`)
     .join("");
@@ -137,8 +137,6 @@ export async function workOnTask(
   previousTask?: TasksRow,
 ) {
   let loopCount = 0;
-
-  //
   const task = await createTaskWithSubs(taskConfig, previousTask);
 
   let subtask = getNextSubtask(task.id);

@@ -32,22 +32,6 @@ export async function createPiSession(config: PiSessionConfig) {
 
   await fileBasedResourceLoader.reload();
 
-  fileBasedResourceLoader.getSystemPrompt = () => config.systemPrompt ?? "";
-  // //pick and choose from file-based thingie
-  // const resourceLoader: ResourceLoader = {
-  //   getExtensions: () => fileBasedResourceLoader.getExtensions(),
-  //   getSkills: () => ({ skills: [], diagnostics: [] }),
-  //   getPrompts: () => ({ prompts: [], diagnostics: [] }),
-  //   getThemes: () => ({ themes: [], diagnostics: [] }),
-  //   getAgentsFiles: () => ({ agentsFiles: [] }),
-  //   getSystemPrompt: () => config.systemPrompt ?? "",
-  //   getSystemPromptSource: () => undefined,
-  //   getAppendSystemPrompt: () => [],
-  //   getAppendSystemPromptSources: () => [],
-  //   extendResources: () => { },
-  //   reload: async () => { },
-  // };
-
   modelRuntime.registerProvider("local", {
     api: "openai-completions",
     baseUrl: "http://127.0.0.1:8080/v1",
@@ -86,7 +70,7 @@ export async function createPiSession(config: PiSessionConfig) {
   });
   session.subscribe((e) => {
     if (e.type == "tool_execution_start") {
-      logger.info(`Tool call ${e.toolName} with args ${e.args}`)
+      logger.info(`Tool call ${e.toolName} with args ${JSON.stringify(e.args)}`)
     }
 
     if (e.type == "message_end" && e.message.role != "system") {

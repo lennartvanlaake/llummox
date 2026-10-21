@@ -4,20 +4,23 @@ import { join } from "node:path";
 
 export async function addFileToRag(
   file: string,
-  type: string,
   subject: string,
 ) {
   const text = await Bun.file(file).text();
-  return embedDocument(file, text, type, subject);
+  return embedDocument(file, text, subject);
 }
 
 export async function addDirectoryToRag(
   directory: string,
-  type: string,
   subject: string,
 ) {
   const dir = await readdir(directory);
   for (const file of dir) {
-    await addFileToRag(join(directory, file), type, subject);
+    try {
+
+      await addFileToRag(join(directory, file), subject);
+    } catch (e) {
+      await addDirectoryToRag(join(directory, file), subject);
+    }
   }
 }

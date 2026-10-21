@@ -62,7 +62,7 @@ describe("setup DB", () => {
   });
 
   test("insertDocVector + dbSearch rank by cosine similarity and return text", async () => {
-    const doc = await insertDoc(1, "h1", "md", "prose");
+    const doc = await insertDoc(1, "h1", "prose");
     const chunk = await insertDocChunk(doc, "about coffee");
 
     // Build two embeddings in-process: one near +x, one near +y.
@@ -77,7 +77,7 @@ describe("setup DB", () => {
     // Query near +x: nearX should rank first, then nearY.
     const qX = new Array(EMBEDDING_DIMENSIONS).fill(0);
     qX[0] = 1;
-    const res = await dbSearch([qX], 10);
+    const res = await dbSearch([qX], 10, "prose");
     expect(res.length).toBe(2);
     const dist = res.map((r) => r.distance);
     expect(Number(dist[0]!)).toBeLessThanOrEqual(Number(dist[1]!));
@@ -87,7 +87,7 @@ describe("setup DB", () => {
     // the nearY row (dim 1) must still match a +y query.
     const qY = new Array(EMBEDDING_DIMENSIONS).fill(0);
     qY[1] = 1;
-    const resY = await dbSearch([qY], 10);
+    const resY = await dbSearch([qY], 10, "prose");
     expect(resY.length).toBe(2);
     const ydist = resY.map((r) => r.distance);
     // nearY (dim1) must be closest to the +y query
@@ -95,7 +95,7 @@ describe("setup DB", () => {
   });
 
   test("insertDocVector flattens a single-row matrix embedding", async () => {
-    const doc = await insertDoc(1, "h1", "md", "prose");
+    const doc = await insertDoc(1, "h1", "prose");
     const chunk = await insertDocChunk(doc, "doc");
 
     // embed() returns a 2D matrix; flatten must preserve all dims.
@@ -128,7 +128,7 @@ describe("setup DB", () => {
 
 describe("insertDoc", () => {
   test("persists a doc row and returns its numeric id", () => {
-    const id = insertDoc(1, "h1", "md", "prose");
+    const id = insertDoc(1, "h1", "prose");
     expect(Number.isInteger(id)).toBe(true);
     const row = db.query("SELECT path FROM docs WHERE id = ?").get(id) as {
       path: string;
@@ -150,7 +150,7 @@ describe("insertDocChunk", () => {
   });
 
   test("persists source (doc id) and content, linked to the doc", () => {
-    const docId = insertDoc(2, "hash", "md", "prose");
+    const docId = insertDoc(2, "hash", "prose");
     insertDocChunk(docId, "keep me");
     const rows = db
       .query(

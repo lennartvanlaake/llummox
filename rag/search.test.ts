@@ -41,7 +41,7 @@ describe("search", () => {
   test("inserts each corpus chunk with a real embedding", async () => {
     for (const c of corpus) {
       // new schema: docs holds path/hash/type/theme; chunks reference doc id.
-      const docId = insertDoc(c.source, "h" + c.source, "md", "prose");
+      const docId = insertDoc(c.source, "h" + c.source, "prose");
       const id = insertDocChunk(docId, c.content);
       const emb = await embed(c.content);
       expect(emb.length).toBe(EMBEDDING_DIMENSIONS);
@@ -55,7 +55,7 @@ describe("search", () => {
     // "dog -> pet -> animal" is semantically close to the cat doc, not the
     // others. embed() + search() should surface the cat content nearest-first.
     const query = "A dog is a domestic pet animal kept by people.";
-    const res = await searchRag(query, 1);
+    const res = await searchRag(query, 1, "prose");
 
     // res is non-empty: the paraphrase must rank-first (guarantees res[0]).
     expect(res.length).toBe(1);
@@ -70,7 +70,7 @@ describe("search", () => {
     await insertDocChunks(corpus);
 
     const query = "Something you drink in the morning to wake up.";
-    const res = await searchRag(query, 3);
+    const res = await searchRag(query, 3, "prose");
 
     // coffee doc should rank ahead of the unrelated car/bread/cats docs
     expect(res.find((r) => r.source === "coffee")).toBeDefined();
@@ -82,7 +82,7 @@ describe("search", () => {
 
   test("returns at most maxResults rows", async () => {
     await insertDocChunks(corpus);
-    const res = await searchRag("unrelated topic zzz", 2);
+    const res = await searchRag("unrelated topic zzz", 2, "prose");
     expect(res).toHaveLength(2);
   });
 });
@@ -100,7 +100,7 @@ async function insertDocChunks(list: { source: string; content: string }[]) {
   for (const c of list) {
     // new schema: create the parent docs row first so dbSearch's JOIN resolves
     // the chunk text (doc_chunks -> docs.path).
-    const docId = insertDoc(c.source, "h" + c.source, "md", "prose");
+    const docId = insertDoc(c.source, "h" + c.source, "prose");
     const id = insertDocChunk(docId, c.content);
     const emb = await embed(c.content);
     insertDocVector(id, emb);

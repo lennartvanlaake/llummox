@@ -41,15 +41,33 @@ describe("crud subtasks", () => {
       taskId: task.id,
     });
     expect(st.id).toBeTruthy();
+    // ponytail: auto-assigned next per-task order (max+1) when omitted.
+    expect(st.order).toBe(0);
 
     const all = await crud.listSubtasks(task.id);
     expect(all.map((s) => s.id)).toContain(st.id);
 
+    // explicit order is honored and re-seeds the per-task sequence.
+    const st2 = await crud.createSubtask({
+      title: "S1",
+      description: "d",
+      taskId: task.id,
+    });
+    expect(st2.order).toBe(1);
+    expect(
+      await crud
+        .createSubtask({ title: "S3", description: "d", taskId: task.id })
+        .then((s) => s.order),
+    ).toBe(2);
+
     const updated = await crud.updateSubtask(st.id, { status: "blocked" });
     expect(updated?.status).toBe("blocked");
 
+    // getNextSubtask returns the lowest order first regardless of insertion.
+    expect((await crud.getNextSubtask(task.id))?.id).toBe(st2.id);
+
     expect(await crud.deleteSubtask(st.id)).toBe(true);
-    expect(await crud.listSubtasks(task.id)).toHaveLength(0);
+    expect(await crud.listSubtasks(task.id)).toHaveLength(2);
     expect(await crud.deleteSubtask(st.id)).toBe(false);
   });
 });

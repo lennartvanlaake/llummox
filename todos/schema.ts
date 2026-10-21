@@ -16,11 +16,16 @@ export type TasksInsert = typeof tasksTable.$inferInsert;
 export const subtasksTable = sqliteTable("subtasks", {
   id: text().notNull(),
   status: text().notNull().default("todo"),
-  taskId: text().references(() => tasksTable.id),
+  taskId: text().notNull().references(() => tasksTable.id),
   title: text().notNull(),
   description: text().notNull(),
   notes: text(),
   createdAt: integer().notNull().default(CURRENT_TIMESTAMP),
+  // ponytail: base value; the per-task next-sequence (max+1) is assigned in
+  // crud.createSubtask where subtasksTable is already in scope. Keeping the
+  // default a literal avoids a temporal dead zone (a column-default can't
+  // reference subtasksTable.order).
+  order: integer().notNull().default(0),
 });
 export type SubtasksRow = typeof subtasksTable.$inferSelect;
 export type SubtasksInsert = typeof subtasksTable.$inferInsert;

@@ -16,11 +16,11 @@ describe("embedDocument", () => {
   test("inserts one row per chunk of the source", async () => {
     const text =
       "Alpha sentence. Beta sentence. Gamma sentence. Delta sentence.";
-    await embedDocument("book-1", text, "text", "general");
+    await embedDocument("book-1", text, "general");
     // new schema: docs holds path/hash/type/theme; chunks live in doc_chunks.
-    const rows = db
-      .query("SELECT content FROM doc_chunks")
-      .all() as Array<{ content: string }>;
+    const rows = db.query("SELECT content FROM doc_chunks").all() as Array<{
+      content: string;
+    }>;
     expect(rows.length).toBeGreaterThan(0);
     // each row's content is non-empty
     for (const r of rows) {
@@ -32,10 +32,11 @@ describe("embedDocument", () => {
     await embedDocument(
       "book-2",
       "One thing. Another thing. Yet another thing.",
-      "text",
       "general",
     );
-    const rows = db.query("SELECT embedding FROM vec_doc_chunks").all() as Array<{
+    const rows = db
+      .query("SELECT embedding FROM vec_doc_chunks")
+      .all() as Array<{
       embedding: Uint8Array;
     }>;
     for (const r of rows) {
@@ -49,10 +50,11 @@ describe("embedDocument", () => {
     await embedDocument(
       "book-3",
       "First chunk here. Second chunk here.",
-      "text",
       "general",
     );
-    const rows = db.query("SELECT id, embedding FROM vec_doc_chunks").all() as Array<{
+    const rows = db
+      .query("SELECT id, embedding FROM vec_doc_chunks")
+      .all() as Array<{
       embedding: Uint8Array;
     }>;
     expect(rows.length).toBeGreaterThan(0);
