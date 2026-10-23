@@ -77,8 +77,14 @@ describe("updateTaskData", () => {
     });
     expect(res.result.isError).toBe(false);
 
+    await invokeTool(updateTaskData, {
+      taskId,
+      path: "blup",
+      value: `{"bleep": "bloop"}`,
+    });
     const fetched = getTask(taskId)!;
     expect((fetched.data as any).friends).toEqual(["Tom", "Andy"]);
+    expect((fetched.data as any).blup.bleep).toEqual("bloop");
   });
 
   test("errors on a missing task", async () => {
