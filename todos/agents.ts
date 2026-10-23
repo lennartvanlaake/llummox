@@ -1,5 +1,7 @@
 import {
   createSubtaskTool,
+  renderTodoManagerTools,
+  renderTodoWorkerTools,
   updateSubtaskWorkerTool,
   updateTaskTool,
 } from "./tools.ts";
@@ -25,8 +27,8 @@ type PiAgentOptions = {
 export type TaskConfig = {
   cwd: string;
   prompt: string;
-  worker: AgentSession;
-  manager?: AgentSession;
+  worker: PiAgentOptions;
+  manager?: PiAgentOptions;
 };
 
 const defaultPiOptions = { cwd: "/tmp" };
@@ -39,7 +41,10 @@ const summarizerSystemPrompt = `You are an expect summarizer. You consolidate al
 
 export function createPiWorkerAgent(
   options: PiAgentOptions = defaultPiOptions,
+  subtaskId: string
 ) {
+  // add the data editing
+  const { updateSubtaskWorkerTool } = renderTodoWorkerTools(subtaskId)
   return createPiSession({
     cwd: options.cwd,
     tools: [updateSubtaskWorkerTool, ...(options?.tools ?? [])],
@@ -48,7 +53,9 @@ export function createPiWorkerAgent(
   });
 }
 
-export function createManagerAgent(options: PiAgentOptions = defaultPiOptions) {
+export function createManagerAgent(options: PiAgentOptions = defaultPiOptions, taskId: string) {
+
+  const { createSubtaskTool } = renderTodoManagerTools(taskId)
   return createPiSession({
     cwd: options.cwd,
     tools: [createSubtaskTool, ...(options?.tools ?? [])],
@@ -59,8 +66,9 @@ export function createManagerAgent(options: PiAgentOptions = defaultPiOptions) {
 
 // TODO edit extensions
 export function createSummarizerAgent(
-  options: PiAgentOptions = defaultPiOptions,
+  options: PiAgentOptions = defaultPiOptions, taskId: string
 ) {
+  const { updateTaskTool } = renderTodoManagerTools(taskId)
   return createPiSession({
     cwd: options.cwd,
     tools: [updateTaskTool, ...(options?.tools ?? [])],
@@ -75,7 +83,7 @@ export async function createTaskWithSubs(
 ) {
   const task = await createTask({ prompt: taskConfig.prompt });
 
-  const agent = taskConfig?.manager ?? (await createManagerAgent());
+  const agent = await createManagerAgent(taskConfig.manager, task.id);
   const prompt = `${taskConfig.prompt} ${previousTask ? `. The notes from the previous task with prompt ${previousTask!.prompt} are ${previousTask!.notes}. ` : ""}The taskId which you use for creating subtasks is "${task.id}"`;
 
   await agent.prompt(prompt);
@@ -114,7 +122,7 @@ export async function doWork(
 }
 
 async function summarize(task: TasksRow) {
-  const agent = await createSummarizerAgent();
+  const agent = await createSummarizerAgent(defaultPiOptions, task.id);
   const subtasks = listSubtasks(task.id);
   const subtasksTemplate = subtasks
     .map((it) => `Title: ${it.title}. Notes: ${it.notes}\n`)
@@ -150,7 +158,7 @@ export async function workOnTask(
       await doWork(
         task,
         subtask,
-        taskConfig.worker,
+        await createPiWorkerAgent(taskConfig.worker, subtask.id),
       );
     } catch (e) {
       logger.error(e);
