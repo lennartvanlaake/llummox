@@ -31,6 +31,7 @@ export async function updateTask(id: string, input: Partial<TasksInsert>) {
     throw new Error(`Task with id ${id} does not exist`);
   }
   const merged = { ...task, ...input };
+  debugger;
   return (
     await db
       .update(tasksTable)

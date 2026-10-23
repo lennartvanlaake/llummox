@@ -4,7 +4,12 @@ import { TASK_STATUSES } from "./constants";
 import { $ } from "bun";
 import { Type } from "@earendil-works/pi-ai";
 import { defineTool } from "@earendil-works/pi-coding-agent";
-import { toPiContent } from "../shared/utils";
+import { logger, toPiContent } from "../shared/utils";
+import { run as runJq } from '@gabrielbryk/jq-ts'
+
+
+/// TODOOO replace with function to inject ids in definition
+
 // ---- Task (story) tools ---------------------------------------------------
 export const updateTaskTool = defineTool({
   label: "update_task",
@@ -41,16 +46,16 @@ export const updateTaskTool = defineTool({
 });
 
 export const updateTaskData = defineTool({
+
   label: "update_task_data",
   name: "Update task data",
   description:
     "Update the data of the give task.",
   parameters: Type.Object({
     taskId: Type.String({ description: "Task id to update." }),
-    path: Type.String({
-      description: `Path of the property to update. Use numerics for array '{"friends":["Tom","Jane","Carol"]}' -> path: friends.1 value -> "Andy" -> {"friends":["Tom","Andy","Carol"]}. Use "-1" to append`,
-    }),
-    value: Type.String({ description: "New value for the path. Unquoted numbers are accepted as numeric. Valid unquoted json will be parsed as such." })
+    jsCommand: Type.String({
+      description: `JavaScript code used with "eval" to edit the data. Assume that the object is a JS object stored in variable called data. Ex: jsCommand: 'data.hello = "world"' -> data = { "hello": "world" }`,
+    })
   }),
 
 
@@ -60,13 +65,41 @@ export const updateTaskData = defineTool({
       if (!before) {
         throw new Error(`Task with id ${params.taskId} does not exist`);
       }
-      const newJson = await $`echo ${JSON.stringify(before.data)} | jj -v ${params.value} ${params.path}`.text()
-      return toPiContent(crud.updateTask(params.taskId, { data: newJson }));
+      const data = before.data;
+      eval(params.jsCommand)
+      return toPiContent(crud.updateTask(params.taskId, { data }));
     } catch (e) {
       return toPiContent(`error: ${(e as Error).message}`, true);
     }
   },
 });
+
+export const getTaskData = defineTool({
+  label: "get_task_data",
+  name: "Get task data",
+  description:
+    "Search the data of the task",
+  parameters: Type.Object({
+    taskId: Type.String(),
+    filter: Type.Optional(
+      Type.String({
+        description: `jq-style filter for the data. Ex: data = { "a": {"b" : "c"} } | filter = ".a" | output { "b": "c" }`,
+      })
+    )
+  }),
+  execute: async (_toolCallId, params) => {
+    const task = crud.getTask(params.taskId)!;
+    if (!params.filter) {
+      return toPiContent(task.data)
+    } else {
+      return toPiContent(runJq(params.filter, task.data as any))
+    }
+  }
+
+});
+
+
+
 
 
 

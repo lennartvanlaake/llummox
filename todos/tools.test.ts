@@ -5,6 +5,7 @@ import { subtasksTable } from "./schema";
 import {
   updateTaskTool,
   updateTaskData,
+  getTaskData,
   createSubtaskTool,
   updateSubtaskWorkerTool,
 } from "./tools";
@@ -62,40 +63,49 @@ describe("scrum task tools", () => {
   });
 });
 
-describe("updateTaskData", () => {
-  test("updates a nested field at a path", async () => {
-    const task = await createTask({
-      prompt: "T",
-      data: { friends: ["Tom", "Jane"] },
-    });
-    const taskId = task.id;
+test("get_task_data returns the full data object when no filter", async () => {
+  const task = await createTask({ prompt: "T", data: { a: 1, b: 2 } });
+  const taskId = task.id;
 
-    const res = await invokeTool(updateTaskData, {
-      taskId,
-      path: "friends.1",
-      value: "Andy",
-    });
-    expect(res.result.isError).toBe(false);
+  const res = await invokeTool(getTaskData, { taskId });
+  expect(res.result.isError).toBe(false);
+  expect(res.text).toContain("1");
+  expect(res.text).toContain("2");
+});
 
-    await invokeTool(updateTaskData, {
-      taskId,
-      path: "blup",
-      value: `{"bleep": "bloop"}`,
-    });
-    const fetched = getTask(taskId)!;
-    expect((fetched.data as any).friends).toEqual(["Tom", "Andy"]);
-    expect((fetched.data as any).blup.bleep).toEqual("bloop");
+test("get_task_data applies a jq-style filter", async () => {
+  const task = await createTask({ prompt: "T", data: { a: { b: "c" } } });
+  const taskId = task.id;
+
+  const res = await invokeTool(getTaskData, {
+    taskId,
+    filter: '.a | output { "b": .b }',
   });
+  expect(res.result.isError).toBe(false);
+  expect(res.text).toContain("c");
+});
 
-  test("errors on a missing task", async () => {
-    const res = await invokeTool(updateTaskData, {
-      taskId: "nope",
-      path: "a",
-      value: "1",
-    });
-    expect(res.result.isError).toBe(true);
-    expect(res.text).toContain("nope");
+test("get_task_data errors on a missing task", async () => {
+  const res = await invokeTool(getTaskData, { taskId: "ghost" });
+  expect(res.result.isError).toBe(true);
+  expect(res.text).toContain("ghost");
+});
+
+test("updates a nested field at a path", async () => {
+  const task = await createTask({
+    prompt: "T",
+    data: { friends: ["Tom", "Jane"] },
   });
+  const taskId = task.id;
+
+  const res = await invokeTool(updateTaskData, {
+    taskId,
+    jsCommand: "data.friends[1] = 'Andy'",
+  });
+  expect(res.result.isError).toBe(false);
+
+  const fetched = getTask(taskId)!;
+  expect((fetched.data as any).friends).toEqual(["Tom", "Andy"]);
 });
 
 describe("scrum subtask tools", () => {

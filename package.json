@@ -16,6 +16,7 @@
   "dependencies": {
     "@chonkiejs/core": "^0.0.12",
     "@earendil-works/pi-coding-agent": "^1.1.0",
+    "@gabrielbryk/jq-ts": "^1.7.0",
     "@huggingface/transformers": "^4.2.0",
     "drizzle-orm": "^0.45.2",
     "install": "^0.13.0",
