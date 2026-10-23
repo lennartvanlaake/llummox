@@ -7,6 +7,7 @@ export const tasksTable = sqliteTable("tasks", {
   id: text().notNull(),
   status: text().notNull().default("todo"),
   prompt: text().notNull(),
+  data: text({ mode: "json" }).default({}),
   notes: text(),
   createdAt: integer().notNull().default(CURRENT_TIMESTAMP),
 });

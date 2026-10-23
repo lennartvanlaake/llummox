@@ -1,5 +1,6 @@
 import { embedDocument } from "./embed";
 import { readdir } from "node:fs/promises";
+import { statSync } from "node:fs";
 import { join } from "node:path";
 
 export async function addFileToRag(
@@ -16,11 +17,12 @@ export async function addDirectoryToRag(
 ) {
   const dir = await readdir(directory);
   for (const file of dir) {
-    try {
-
-      await addFileToRag(join(directory, file), subject);
-    } catch (e) {
-      await addDirectoryToRag(join(directory, file), subject);
+    const path = join(directory, file)
+    const stats = statSync(path)
+    if (stats.isDirectory()) {
+      await addDirectoryToRag(path, subject);
+    } else {
+      await addFileToRag(path, subject);
     }
   }
 }

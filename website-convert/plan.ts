@@ -1,5 +1,5 @@
 import { getTree } from "../shared/scout/functions";
-import type { MainStateType } from ".";
+import type { MainStateTypeOut } from ".";
 import {
   createPiWorkerAgent,
   type TaskConfig,
@@ -12,12 +12,16 @@ import {
   simplifyHtml,
 } from "../shared/scout/tools";
 import { initRagTool } from "../rag/tools";
+import { setupDatabase as setupRagDb } from "../rag/db";
+import { setupDatabase as setupTodosDb } from "../todos/db";
 
-export async function plan(state: MainStateType) {
+export async function plan(state: MainStateTypeOut) {
+  setupTodosDb(state.db)
+  setupRagDb(state.db)
+
   const tree = JSON.stringify(await getTree(state.originDir));
 
-
-  const ragTool = await initRagTool(`${import.meta.dir}/rag.db`, [{ dir: `${import.meta.dir}/knowledge/astro`, subject: "astro" }, { dir: `${import.meta.dir}/knowledge/sveltia`, subject: "sveltia" }])
+  const ragTool = await initRagTool(state.db, [{ dir: `${import.meta.dir}/knowledge/astro`, subject: "astro" }, { dir: `${import.meta.dir}/knowledge/sveltia`, subject: "sveltia" }])
 
   const tools = [
     ragTool,
@@ -38,9 +42,12 @@ export async function plan(state: MainStateType) {
     prompt: `You are studying the website at ${state.originDir}. Have your workers research its structure and content. Primary interest is distribution of content over pages and any repeating structures. The directory tree looks like this: ${tree}. Distribute the research into small subtasks. Subtasks either cover a set of related smaller files (<5KB) or 1 >5KB file`,
   };
 
+
   const coderConfig: TaskConfig = {
     cwd: state.projectDir,
     worker: await createPiWorkerAgent({
+      tools,
+      builtinTools: ["edit", "write", "read", "bash", "find", "ls"],
       cwd: state.projectDir,
       systemPromptAppend: `You are an expert web developer. Prefer using edit over write when possible. The directory tree looks like this: ${tree}.`,
     }),

@@ -76,10 +76,16 @@ describe("scrum subtask tools", () => {
       description: "Draft the meeting agenda",
       taskId,
     })) as any;
-    expect(made.text).toContain("subTaskId");
-    const subtaskId: string = JSON.parse(made.text).subTaskId;
-    // ponytail: order auto-assigned (max+1) when the tool omits it.
-    expect(made.text).toContain("order");
+    expect(made.text).toBe("ok");
+
+    // create returns "ok" now, so look the new subtask up by task.
+    const rows = await db
+      .select({ id: subtasksTable.id, status: subtasksTable.status })
+      .from(subtasksTable)
+      .where(eq(subtasksTable.taskId, taskId))
+      .orderBy(subtasksTable.order);
+    const subtaskId = rows.at(-1)!.id;
+    expect(rows.at(-1)!.status).toBe("todo");
 
     // status + notes in one call (merged tool)
     const res = await invokeTool(updateSubtaskWorkerTool, {
@@ -88,7 +94,7 @@ describe("scrum subtask tools", () => {
       notes: "wait on spec",
     });
     expect(res.result.isError).toBe(false);
-    expect(res.text).toContain("error");
+    expect(res.text).toBe("ok");
 
     const fetched = await db
       .select()

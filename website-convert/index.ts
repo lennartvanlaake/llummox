@@ -1,29 +1,26 @@
-import { z } from "zod/v4";
 import { init } from "./init.ts";
+import { plan } from "./plan.ts";
 
-const MainState = z.object({
-  url: z.string(),
-  project: z.string(),
-  originDir: z.string().default(""),
-  projectDir: z.string().default(""),
-  targetDir: z.string().default(""),
-});
 
-export type MainStateType = z.infer<typeof MainState>;
-
-export async function run(state: MainStateType) {
-  await init({
-    url: state.url,
-    project: state.project,
-    projectDir: state.projectDir,
-    originDir: state.originDir,
-    targetDir: state.targetDir,
-  });
+export type MainStateTypeIn = {
+  url: string,
+  project: string,
+  db: string
 }
 
-// await run({
-//   url: "https://motherfuckingwebsite.com",
-//   project: "mf",
-//   originDir: "",
-//   targetDir: "",
-// });
+export type MainStateTypeOut = {
+  url: string,
+  project: string,
+  db: string
+  projectsBase: string,
+  projectDir: string,
+  originDir: string,
+  targetDir: string
+}
+
+export async function run(state: MainStateTypeIn) {
+  await init(state);
+  await plan(state as MainStateTypeOut);
+}
+
+

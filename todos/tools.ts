@@ -1,6 +1,7 @@
 import * as crud from "./crud";
 import { TASK_STATUSES } from "./constants";
 
+import { $ } from "bun";
 import { Type } from "@earendil-works/pi-ai";
 import { defineTool } from "@earendil-works/pi-coding-agent";
 import { toPiContent } from "../shared/utils";
@@ -31,13 +32,45 @@ export const updateTaskTool = defineTool({
 
       if (params.status !== undefined) changes.status = params.status;
       if (params.notes !== undefined) changes.notes = params.notes;
-
-      return toPiContent(crud.updateTask(params.taskId, changes));
+      crud.updateTask(params.taskId, changes)
+      return toPiContent("ok");
     } catch (e) {
       return toPiContent({ error: `error: ${(e as Error).message}` }, true);
     }
   },
 });
+
+export const updateTaskData = defineTool({
+  label: "update_task_data",
+  name: "Update task data",
+  description:
+    "Update the data of the give task",
+  parameters: Type.Object({
+    taskId: Type.String({ description: "Task id to update." }),
+    path: Type.String({
+      description: `Path of the property to update. Use umerics for array '{"friends":["Tom","Jane","Carol"]}' -> path: friends.1 value -> "Andy" -> {"friends":["Tom","Andy","Carol"]}. Use "-1" to append`,
+    }),
+    value: Type.String({ description: "New value for the path. Unquoted numbers are accepted as numeric. Valid unquoted json will be parsed as such." })
+  }),
+
+
+  execute: async (_toolCallId, params) => {
+    try {
+      const before = crud.getTask(params.taskId);
+      if (!before) {
+        throw new Error(`Task with id ${params.taskId} does not exist`);
+      }
+
+      const newJson = await $`echo ${JSON.stringify(before.data)} | jj -v ${params.value} ${params.path}`.text()
+
+      return toPiContent(crud.updateTask(params.taskId, { data: newJson }));
+    } catch (e) {
+      return toPiContent({ error: `error: ${(e as Error).message}` }, true);
+    }
+  },
+});
+
+
 
 // ---- Subtask tools --------------------------------------------------------
 
@@ -106,11 +139,10 @@ export const createSubtaskTool = defineTool({
         title: params.title,
         description: params.description,
         taskId: params.taskId,
-        order: params.order
-      })
+        order: params.order,
+      });
 
-      debugger
-      return toPiContent({ taskId: params.taskId, subTaskId: subtask.id, order: subtask.order });
+      return toPiContent("ok");
     } catch (e: unknown) {
       return toPiContent({ error: (e as Error).message });
     }
@@ -136,11 +168,13 @@ export const updateSubtaskWorkerTool = defineTool({
       // empty-string notes = "no notes", so it does not overwrite the existing
       // handoff notes (which would otherwise make the manager's handoff prompt
       // dead and strand the worker on the same subtask forever).
-      const changes = { status: params.status };
-      if (params.notes && params.notes !== "") changes["notes"] = params.notes;
+      const changes: { status: string; notes?: string } = {
+        status: params.status,
+      };
+      if (params.notes && params.notes !== "") changes.notes = params.notes;
 
       await crud.updateSubtask(params.subtaskId, changes);
-      return toPiContent({ error: null });
+      return toPiContent("ok");
     } catch (e) {
       return toPiContent({ error: (e as Error).message }, true);
     }
@@ -169,7 +203,7 @@ export const updateSubtaskManagerTool = defineTool({
       };
 
       await crud.updateSubtask(params.subtaskId, changes);
-      return toPiContent({ error: null });
+      return toPiContent("ok");
     } catch (e) {
       return toPiContent({ error: (e as Error).message }, true);
     }

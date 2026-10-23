@@ -4,8 +4,7 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "devtools": "bunx @ai-sdk/devtools@latest",
-    "todos:migrations": "bunx drizzle-kit generate --dialect sqlite --schema ./schema.ts"
+    "todos:migrations": "cd todos && bunx drizzle-kit generate --dialect sqlite --schema schema.ts"
   },
   "devDependencies": {
     "@types/bun": "latest",

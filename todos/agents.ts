@@ -20,6 +20,7 @@ type PiAgentOptions = {
   cwd: string;
   systemPromptAppend?: string;
   tools?: ToolDefinition[];
+  builtinTools?: string[];
 };
 export type TaskConfig = {
   cwd: string;
@@ -43,15 +44,16 @@ export function createPiWorkerAgent(
     cwd: options.cwd,
     tools: [updateSubtaskWorkerTool, ...(options?.tools ?? [])],
     systemPrompt: `${workerSystemPrompt} ${options.systemPromptAppend ?? ""}`,
+    builtinTools: options.builtinTools ?? []
   });
 }
 
-// TODO edit extensions
 export function createManagerAgent(options: PiAgentOptions = defaultPiOptions) {
   return createPiSession({
     cwd: options.cwd,
     tools: [createSubtaskTool, ...(options?.tools ?? [])],
     systemPrompt: `${managerSystemPrompt} ${options.systemPromptAppend ?? ""}`,
+    builtinTools: options.builtinTools ?? []
   });
 }
 
@@ -63,6 +65,7 @@ export function createSummarizerAgent(
     cwd: options.cwd,
     tools: [updateTaskTool, ...(options?.tools ?? [])],
     systemPrompt: `${summarizerSystemPrompt} ${options.systemPromptAppend ?? ""}`,
+    builtinTools: options.builtinTools ?? []
   });
 }
 

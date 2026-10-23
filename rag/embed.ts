@@ -1,4 +1,4 @@
-import { insertDoc, insertDocChunk, insertDocVector } from "./db";
+import { checkDocUnchanged, insertDoc, insertDocChunk, insertDocVector } from "./db";
 import { EMBEDDING_DIMENSIONS } from "./constants";
 import { pipeline } from "@huggingface/transformers";
 
@@ -75,7 +75,13 @@ export async function embedDocument(
   content: string,
   subject: string,
 ) {
-  const docId = insertDoc(source, hash(content).toString(), subject);
+
+  const dockHash = hash(content).toString()
+  if (checkDocUnchanged(source, dockHash)) {
+    console.log(`Doc at ${source} unchanged, skipping`);
+    return;
+  }
+  const docId = insertDoc(source, dockHash, subject);
   const chunks = await chunk(content);
   console.log(`Embedding ${chunks.length} chunks from ${source}`);
   let chunkCount = 0;
