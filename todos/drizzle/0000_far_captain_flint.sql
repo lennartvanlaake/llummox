@@ -1,5 +1,5 @@
 CREATE TABLE `subtasks` (
-	`id` text NOT NULL,
+	`id` text PRIMARY KEY NOT NULL,
 	`status` text DEFAULT 'todo' NOT NULL,
 	`taskId` text NOT NULL,
 	`title` text NOT NULL,
@@ -11,9 +11,10 @@ CREATE TABLE `subtasks` (
 );
 --> statement-breakpoint
 CREATE TABLE `tasks` (
-	`id` text NOT NULL,
+	`id` text PRIMARY KEY NOT NULL,
 	`status` text DEFAULT 'todo' NOT NULL,
 	`prompt` text NOT NULL,
+	`data` text DEFAULT '{}',
 	`notes` text,
 	`createdAt` integer DEFAULT CURRENT_TIMESTAMP NOT NULL
 );

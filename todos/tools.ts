@@ -44,11 +44,11 @@ export const updateTaskData = defineTool({
   label: "update_task_data",
   name: "Update task data",
   description:
-    "Update the data of the give task",
+    "Update the data of the give task.",
   parameters: Type.Object({
     taskId: Type.String({ description: "Task id to update." }),
     path: Type.String({
-      description: `Path of the property to update. Use umerics for array '{"friends":["Tom","Jane","Carol"]}' -> path: friends.1 value -> "Andy" -> {"friends":["Tom","Andy","Carol"]}. Use "-1" to append`,
+      description: `Path of the property to update. Use numerics for array '{"friends":["Tom","Jane","Carol"]}' -> path: friends.1 value -> "Andy" -> {"friends":["Tom","Andy","Carol"]}. Use "-1" to append`,
     }),
     value: Type.String({ description: "New value for the path. Unquoted numbers are accepted as numeric. Valid unquoted json will be parsed as such." })
   }),
@@ -60,12 +60,10 @@ export const updateTaskData = defineTool({
       if (!before) {
         throw new Error(`Task with id ${params.taskId} does not exist`);
       }
-
       const newJson = await $`echo ${JSON.stringify(before.data)} | jj -v ${params.value} ${params.path}`.text()
-
       return toPiContent(crud.updateTask(params.taskId, { data: newJson }));
     } catch (e) {
-      return toPiContent({ error: `error: ${(e as Error).message}` }, true);
+      return toPiContent(`error: ${(e as Error).message}`, true);
     }
   },
 });
@@ -94,7 +92,7 @@ export const getSubtasksTool = defineTool({
     ),
   }),
   execute: async (_toolCallId, params) => {
-    const subtasks = crud.getSubtasks(params.taskId) ?? [];
+    const subtasks = crud.listSubtasks(params.taskId) ?? [];
     return toPiContent({
       subtasks: subtasks.map((it) => ({
         id: it.id,

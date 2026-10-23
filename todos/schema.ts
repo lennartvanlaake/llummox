@@ -4,7 +4,7 @@ import { sqliteTable, integer, text } from "drizzle-orm/sqlite-core";
 export const CURRENT_TIMESTAMP = sql`CURRENT_TIMESTAMP`;
 
 export const tasksTable = sqliteTable("tasks", {
-  id: text().notNull(),
+  id: text().notNull().primaryKey(),
   status: text().notNull().default("todo"),
   prompt: text().notNull(),
   data: text({ mode: "json" }).default({}),
@@ -15,7 +15,7 @@ export type TasksRow = typeof tasksTable.$inferSelect;
 export type TasksInsert = typeof tasksTable.$inferInsert;
 
 export const subtasksTable = sqliteTable("subtasks", {
-  id: text().notNull(),
+  id: text().primaryKey().notNull(),
   status: text().notNull().default("todo"),
   taskId: text().notNull().references(() => tasksTable.id),
   title: text().notNull(),

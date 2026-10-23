@@ -4,6 +4,7 @@ import { setupDatabase, db } from "./db";
 import { subtasksTable } from "./schema";
 import {
   updateTaskTool,
+  updateTaskData,
   createSubtaskTool,
   updateSubtaskWorkerTool,
 } from "./tools";
@@ -58,6 +59,36 @@ describe("scrum task tools", () => {
 
     const fetched = getTask(taskId)!;
     expect(fetched.notes).toBe("");
+  });
+});
+
+describe("updateTaskData", () => {
+  test("updates a nested field at a path", async () => {
+    const task = await createTask({
+      prompt: "T",
+      data: { friends: ["Tom", "Jane"] },
+    });
+    const taskId = task.id;
+
+    const res = await invokeTool(updateTaskData, {
+      taskId,
+      path: "friends.1",
+      value: "Andy",
+    });
+    expect(res.result.isError).toBe(false);
+
+    const fetched = getTask(taskId)!;
+    expect((fetched.data as any).friends).toEqual(["Tom", "Andy"]);
+  });
+
+  test("errors on a missing task", async () => {
+    const res = await invokeTool(updateTaskData, {
+      taskId: "nope",
+      path: "a",
+      value: "1",
+    });
+    expect(res.result.isError).toBe(true);
+    expect(res.text).toContain("nope");
   });
 });
 
