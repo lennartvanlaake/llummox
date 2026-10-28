@@ -20,6 +20,7 @@
     "@huggingface/transformers": "^4.2.0",
     "drizzle-orm": "^0.45.2",
     "install": "^0.13.0",
+    "json-schema-library": "^11.6.16",
     "pino": "^10.3.1",
     "sqlite-vec": "^0.1.9"
   }

@@ -1,16 +1,18 @@
 import * as crud from "./crud";
 import { TASK_STATUSES } from "./constants";
 
-import { $ } from "bun";
 import { Type } from "@earendil-works/pi-ai";
 import { defineTool } from "@earendil-works/pi-coding-agent";
 import { logger, toPiContent } from "../shared/utils";
 import { run as runJq } from '@gabrielbryk/jq-ts'
+import { compileSchema } from "json-schema-library";
 
 
-/// TODOOO replace with function to inject ids in definition
+export function renderTodoManagerTools(taskId: string, schema: any) {
 
-export function renderTodoManagerTools(taskId: string) {
+  const compiledSchema = compileSchema(schema)
+  const defaultData = schema.getData();
+
 
   // ---- Task (story) tools ---------------------------------------------------
   const updateTaskTool = defineTool({
@@ -49,7 +51,9 @@ export function renderTodoManagerTools(taskId: string) {
     label: "update_task_data",
     name: "Update task data",
     description:
-      "Update the data of the give task.",
+      `Update the data of the give task. Data will be checked against json-schema: """ 
+        ${JSON.stringify(schema)}
+   """}`,
     parameters: Type.Object({
       jsCommand: Type.String({
         description: `JavaScript code used with "eval" to edit the data. Assume that the object is a JS object stored in variable called data. Ex: jsCommand: 'data.hello = "world"' -> data = { "hello": "world" }`,
@@ -62,6 +66,10 @@ export function renderTodoManagerTools(taskId: string) {
         const before = crud.getTask(taskId)!;
         const data = before.data;
         eval(params.jsCommand)
+        const { valid, errors } = schema.validate(data);
+        if (!valid) {
+          throw Error(`Data invalid: ${JSON.stringify(errors)}. Expected data to comply to schema ${JSON.stringify(schema)}. Example of compliant data: ${defaultData}`)
+        }
         return toPiContent(crud.updateTask(taskId, { data }));
       } catch (e) {
         return toPiContent(`error: ${(e as Error).message}`, true);
