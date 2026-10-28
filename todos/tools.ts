@@ -11,7 +11,7 @@ import { compileSchema } from "json-schema-library";
 export function renderTodoManagerTools(taskId: string, schema: any) {
 
   const compiledSchema = compileSchema(schema)
-  const defaultData = schema.getData();
+  const defaultData = compiledSchema.getData();
 
 
   // ---- Task (story) tools ---------------------------------------------------

@@ -2,6 +2,10 @@ import { readdir } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { $ } from "bun";
 import type { MainStateTypeIn, MainStateTypeOut } from ".";
+import { logger } from "../shared/utils";
+import child_process from "node:child_process";
+import util from "node:util";
+const exec = util.promisify(child_process.exec);
 
 function getBaseProjectDir(project: string, base?: string) {
 
@@ -44,7 +48,11 @@ export async function init(inState: MainStateTypeIn): Promise<MainStateTypeOut> 
     try {
 
 
-      await $`wget --mirror --convert-links --adjust-extension --page-requisites --no-parent ${state.url} -P ${originDir}`;
+      // const result = await exec(`cd ${import.meta.dir} && ls -la`, { shell: "zsh" })
+      const result = await exec(`cd ${import.meta.dir}/website-downloader && source .venv/bin/activate && pip install -e . && website-downloader --url ${state.url} --destination ${originDir}`, { shell: "zsh" })
+      logger.info(result.stderr)
+      logger.info(result.stdout)
+      // await $`wget --mirror --convert-links --adjust-extension --page-requisites --no-parent ${state.url} -P ${originDir}`;
     } catch (e) {
       logger.error(e)
     }

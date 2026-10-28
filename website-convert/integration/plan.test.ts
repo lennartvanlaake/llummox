@@ -16,8 +16,20 @@ test("test planning on very small project", async () => {
   await run({
     project: "tuesday",
     projectsBase: `${import.meta.dir}/fixtures`,
-    url: "https://isittuesday.org/",
-    db: `${import.meta.dir}/${db}.db`
+    url: "https://isittuesday.org",
+    db: `${import.meta.dir}/${db}`
   });
   await $`rm ${db}`;
 }, 0);
+// test("test planning on very small project", async () => {
+//   $.cwd(import.meta.dir);
+//   const db = "leer.db"
+//   await $`cp rag-seed.db ${db}`;
+//   await run({
+//     project: "leer",
+//     projectsBase: `${import.meta.dir}/fixtures`,
+//     url: "https://leerob.com/",
+//     db: `${import.meta.dir}/${db}`
+//   });
+//   await $`rm ${db}`;
+// }, 0);

@@ -36,7 +36,7 @@ const managerSystemPrompt = `You are an expect delegator. Create subtasks with c
 
 export const workerSystemPrompt = `You are a worker. You focus on executing the subtask as quickly as possible. You are part of a team that is executing a larger task. Use this only as context, do NOT do work outside of your subtask. If asked or needed, use your "updateSubtask" tool to report about your progress by editing notes. Change status to done if you are done, to "in-progress" if you finish without completing the subtask`;
 
-const summarizerSystemPrompt = `You are an expect summarizer. You consolidate all the notes of the completed subtasks into the notes of a task. Use the updateData and getData tools to take the notes from the subtasks and convert them into a data object described by the requested schema. Your chat respones are irrelevant, answer ".". `;
+const summarizerSystemPrompt = `You are an expect summarizer. Use the updateData and getData tools to take the notes from the subtasks and convert them into a data object described by the requested schema. Your chat respones are irrelevant, answer ".". `;
 
 export function createPiWorkerAgent(
   options: PiAgentOptions = defaultPiOptions,
@@ -57,7 +57,7 @@ export function createManagerAgent(options: PiAgentOptions = defaultPiOptions, s
   return createPiSession({
     cwd: options.cwd,
     tools: [createSubtaskTool, ...(options?.tools ?? [])],
-    systemPrompt: `${managerSystemPrompt} The reports of all the workers together must provide enough information to fill a data object with the following schema ${toToon(schema)}. ${options.systemPromptAppend ?? ""}`,
+    systemPrompt: `${managerSystemPrompt}. ${options.systemPromptAppend ?? ""}`,
     builtinTools: options.builtinTools ?? []
   });
 }
@@ -69,7 +69,7 @@ export function createSummarizerAgent(
   return createPiSession({
     cwd: options.cwd,
     tools: [updateTaskTool, ...(options?.tools ?? [])],
-    systemPrompt: `${summarizerSystemPrompt}.  The data object must comply with the following schema ${toToon(schema)}. ${options.systemPromptAppend ?? ""}`,
+    systemPrompt: `${summarizerSystemPrompt}.  The data object must comply with the following schema ${JSON.stringify(schema)}. ${options.systemPromptAppend ?? ""}`,
     builtinTools: options.builtinTools ?? []
   });
 }
@@ -79,13 +79,15 @@ export async function createTaskWithSubs(
   schema: any,
   previousTask?: TasksRow,
 ) {
-  const defaultData = compileSchema(schema).getData()
+  const compiled = compileSchema(schema);
+  const defaultData = compiled.getData()
   const task = await createTask({ prompt: taskConfig.prompt, data: defaultData });
 
   const agent = await createManagerAgent(taskConfig.manager, schema, task.id);
   const prompt = `${taskConfig.prompt} ${previousTask ? `. The notes from the previous task with prompt ${previousTask!.prompt} are ${previousTask!.notes}. ` : ""}The taskId which you use for creating subtasks is "${task.id}"`;
 
-  await agent.prompt(prompt);
+
+  await agent.prompt(prompt + `When combined, the result of all subtasks MUST be sufficient complete the schema: ${JSON.stringify(schema)}. Add sub-JSON-schemas to your subtasks so your workers know how to format their results`);
 
   // double check that subtasks are actually generated
   if (listSubtasks(task.id).length == 0) {
@@ -128,7 +130,7 @@ async function summarize(task: TasksRow, schema: any) {
     .join("");
 
   await agent.prompt(
-    `Summarize task with id ${task.id} and prompt ${task.prompt}. Subtasks: ${subtasksTemplate}`,
+    `Use updateTaskData to fill the data with the output of the following subtasks. Subtasks: ${subtasksTemplate}. The data should conform to schema ${toToon(schema)}`,
   );
 
   return getTask(task.id);
@@ -147,7 +149,7 @@ export async function workOnTask(
   previousTask?: TasksRow,
 ) {
   let loopCount = 0;
-  const task = await createTaskWithSubs(taskConfig, previousTask);
+  const task = await createTaskWithSubs(taskConfig, taskConfig.schema, previousTask);
 
   let subtask = getNextSubtask(task.id);
 
@@ -168,3 +170,4 @@ export async function workOnTask(
 
   return task;
 }
+
