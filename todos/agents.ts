@@ -1,9 +1,6 @@
 import {
-  createSubtaskTool,
   renderTodoManagerTools,
   renderTodoWorkerTools,
-  updateSubtaskWorkerTool,
-  updateTaskTool,
 } from "./tools.ts";
 import {
   createTask,
@@ -12,11 +9,12 @@ import {
   listSubtasks,
   updateSubtask,
 } from "./crud.ts";
-import { logger } from "../shared/utils.ts";
+import { logger, toToon } from "../shared/utils.ts";
 import { TaskStatus } from "./constants.ts";
 import type { SubtasksRow, TasksRow } from "./schema.ts";
 import type { AgentSession, ToolDefinition } from "@earendil-works/pi-coding-agent";
 import { createPiSession } from "../shared/pi.ts";
+import { compileSchema } from "json-schema-library";
 
 type PiAgentOptions = {
   cwd: string;
@@ -29,15 +27,16 @@ export type TaskConfig = {
   prompt: string;
   worker: PiAgentOptions;
   manager?: PiAgentOptions;
+  schema: any;
 };
 
 const defaultPiOptions = { cwd: "/tmp" };
 
-const managerSystemPrompt = `You are an expect delegator. Create subtasks with conside descriptions. Be terse, no fluff, politeness or exclamations. Simplify and shorten language use. Use the createSubtask tool for delegation. Your chat responses are irrelevant, answer ".". EXTREMELY IMPORTANT: You are not allowed under any circumstance to complete the subtasks yourself. `;
+const managerSystemPrompt = `You are an expect delegator. Create subtasks with conside descriptions. Be terse, no fluff, politeness or exclamations. Simplify and shorten language use. Use the createSubtask tool for delegation. Your chat responses are irrelevant, answer ".". EXTREMELY IMPORTANT: You are not allowed under any circumstance to complete the subtasks yourself.`;
 
 export const workerSystemPrompt = `You are a worker. You focus on executing the subtask as quickly as possible. You are part of a team that is executing a larger task. Use this only as context, do NOT do work outside of your subtask. If asked or needed, use your "updateSubtask" tool to report about your progress by editing notes. Change status to done if you are done, to "in-progress" if you finish without completing the subtask`;
 
-const summarizerSystemPrompt = `You are an expect summarizer. You consolidate all the notes of the completed subtasks into the notes of a task. Use the updateTask tool to write the notes. Preserve all technical information, remove duplication or anything that is not relevant to the purpose of the task. Be terse and laconoic. Convey maximum information in minimum characters. Your chat responses are irrelevant, answer ".". `;
+const summarizerSystemPrompt = `You are an expect summarizer. You consolidate all the notes of the completed subtasks into the notes of a task. Use the updateData and getData tools to take the notes from the subtasks and convert them into a data object described by the requested schema. Your chat respones are irrelevant, answer ".". `;
 
 export function createPiWorkerAgent(
   options: PiAgentOptions = defaultPiOptions,
@@ -53,37 +52,37 @@ export function createPiWorkerAgent(
   });
 }
 
-export function createManagerAgent(options: PiAgentOptions = defaultPiOptions, taskId: string) {
-
-  const { createSubtaskTool } = renderTodoManagerTools(taskId)
+export function createManagerAgent(options: PiAgentOptions = defaultPiOptions, schema: any, taskId: string) {
+  const { createSubtaskTool, updateTaskData, getTaskData } = renderTodoManagerTools(taskId, schema)
   return createPiSession({
     cwd: options.cwd,
     tools: [createSubtaskTool, ...(options?.tools ?? [])],
-    systemPrompt: `${managerSystemPrompt} ${options.systemPromptAppend ?? ""}`,
+    systemPrompt: `${managerSystemPrompt} The reports of all the workers together must provide enough information to fill a data object with the following schema ${toToon(schema)}. ${options.systemPromptAppend ?? ""}`,
     builtinTools: options.builtinTools ?? []
   });
 }
 
-// TODO edit extensions
 export function createSummarizerAgent(
-  options: PiAgentOptions = defaultPiOptions, taskId: string
+  options: PiAgentOptions = defaultPiOptions, taskId: string, schema: any
 ) {
-  const { updateTaskTool } = renderTodoManagerTools(taskId)
+  const { updateTaskTool, updateTaskData, getTaskData } = renderTodoManagerTools(taskId, schema)
   return createPiSession({
     cwd: options.cwd,
     tools: [updateTaskTool, ...(options?.tools ?? [])],
-    systemPrompt: `${summarizerSystemPrompt} ${options.systemPromptAppend ?? ""}`,
+    systemPrompt: `${summarizerSystemPrompt}.  The data object must comply with the following schema ${toToon(schema)}. ${options.systemPromptAppend ?? ""}`,
     builtinTools: options.builtinTools ?? []
   });
 }
 
 export async function createTaskWithSubs(
   taskConfig: TaskConfig,
+  schema: any,
   previousTask?: TasksRow,
 ) {
-  const task = await createTask({ prompt: taskConfig.prompt });
+  const defaultData = compileSchema(schema).getData()
+  const task = await createTask({ prompt: taskConfig.prompt, data: defaultData });
 
-  const agent = await createManagerAgent(taskConfig.manager, task.id);
+  const agent = await createManagerAgent(taskConfig.manager, schema, task.id);
   const prompt = `${taskConfig.prompt} ${previousTask ? `. The notes from the previous task with prompt ${previousTask!.prompt} are ${previousTask!.notes}. ` : ""}The taskId which you use for creating subtasks is "${task.id}"`;
 
   await agent.prompt(prompt);
@@ -121,8 +120,8 @@ export async function doWork(
   await agent.prompt(prompt);
 }
 
-async function summarize(task: TasksRow) {
-  const agent = await createSummarizerAgent(defaultPiOptions, task.id);
+async function summarize(task: TasksRow, schema: any) {
+  const agent = await createSummarizerAgent(defaultPiOptions, task.id, schema);
   const subtasks = listSubtasks(task.id);
   const subtasksTemplate = subtasks
     .map((it) => `Title: ${it.title}. Notes: ${it.notes}\n`)
@@ -139,7 +138,7 @@ export async function workOnPlan(taskConfigs: TaskConfig[]) {
   let previousTask: TasksRow | undefined;
   for (const taskConfig of taskConfigs) {
     const task = await workOnTask(taskConfig, previousTask);
-    previousTask = await summarize(task);
+    previousTask = await summarize(task, taskConfig.schema);
   }
 }
 

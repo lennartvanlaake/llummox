@@ -5,7 +5,8 @@ import { plan } from "./plan.ts";
 export type MainStateTypeIn = {
   url: string,
   project: string,
-  db: string
+  db: string,
+  projectsBase: string,
 }
 
 export type MainStateTypeOut = {

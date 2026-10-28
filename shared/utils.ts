@@ -1,6 +1,7 @@
 import pino from "pino";
 
 import type { AgentToolResult } from "@earendil-works/pi-coding-agent";
+import { encode } from "@toon-format/toon";
 
 export const logger = pino();
 
@@ -23,4 +24,16 @@ function renderContentTemplate(
 		details: content,
 		isError,
 	};
+}
+
+export function toToon(
+	content: any
+) {
+	const toonEncoded = encode(content, { delimiter: '\t' })
+	return `
+	Data is in TOON format (tab indent, arrays show length and fields)
+	\`\`\`toon
+	${toonEncoded}
+	\`\`\`
+	`.trim()
 }

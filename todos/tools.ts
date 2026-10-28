@@ -66,7 +66,7 @@ export function renderTodoManagerTools(taskId: string, schema: any) {
         const before = crud.getTask(taskId)!;
         const data = before.data;
         eval(params.jsCommand)
-        const { valid, errors } = schema.validate(data);
+        const { valid, errors } = compiledSchema.validate(data);
         if (!valid) {
           throw Error(`Data invalid: ${JSON.stringify(errors)}. Expected data to comply to schema ${JSON.stringify(schema)}. Example of compliant data: ${defaultData}`)
         }

@@ -41,7 +41,13 @@ export async function init(inState: MainStateTypeIn): Promise<MainStateTypeOut> 
   if (checkOriginNeedsInit(state)) {
     const originDir = getBaseOriginDir(state.project, state.projectsBase);
     await $`mkdir -p ${originDir}`;
-    await $`wget --mirror --convert-links --adjust-extension --page-requisites --no-parent ${state.url} -P ${originDir}`;
+    try {
+
+
+      await $`wget --mirror --convert-links --adjust-extension --page-requisites --no-parent ${state.url} -P ${originDir}`;
+    } catch (e) {
+      logger.error(e)
+    }
   }
 
   if (checkTargetNeedsInit(state)) {
