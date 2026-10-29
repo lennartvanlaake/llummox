@@ -4,7 +4,8 @@ CREATE TABLE `subtasks` (
 	`taskId` text NOT NULL,
 	`title` text NOT NULL,
 	`description` text NOT NULL,
-	`notes` text,
+	`schema` text DEFAULT '',
+	`result` text DEFAULT 'null',
 	`createdAt` integer DEFAULT CURRENT_TIMESTAMP NOT NULL,
 	`order` integer DEFAULT 0 NOT NULL,
 	FOREIGN KEY (`taskId`) REFERENCES `tasks`(`id`) ON UPDATE no action ON DELETE no action

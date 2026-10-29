@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "d92c5317-9f43-4bb6-9db3-a39ff84a1cfb",
+  "id": "69d38c22-4e07-47fc-8a1c-5984d0a61c7b",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "subtasks": {
@@ -43,12 +43,21 @@
           "notNull": true,
           "autoincrement": false
         },
-        "notes": {
-          "name": "notes",
+        "schema": {
+          "name": "schema",
           "type": "text",
           "primaryKey": false,
           "notNull": false,
-          "autoincrement": false
+          "autoincrement": false,
+          "default": "''"
+        },
+        "result": {
+          "name": "result",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false,
+          "default": "'null'"
         },
         "createdAt": {
           "name": "createdAt",

@@ -17,10 +17,16 @@ export type TasksInsert = typeof tasksTable.$inferInsert;
 export const subtasksTable = sqliteTable("subtasks", {
   id: text().primaryKey().notNull(),
   status: text().notNull().default("todo"),
-  taskId: text().notNull().references(() => tasksTable.id),
+  taskId: text()
+    .notNull()
+    .references(() => tasksTable.id),
   title: text().notNull(),
   description: text().notNull(),
-  notes: text(),
+  // ponytail: JSON text column; the per-subtask report schema written by the
+  // manager at creation. Empty string when none was provided.
+  schema: text({ mode: "json" }),
+  // ponytail: the worker's structured report, validated against `schema`
+  result: text({ mode: "json" }).default(null),
   createdAt: integer().notNull().default(CURRENT_TIMESTAMP),
   // ponytail: base value; the per-task next-sequence (max+1) is assigned in
   // crud.createSubtask where subtasksTable is already in scope. Keeping the

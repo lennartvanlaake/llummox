@@ -1,18 +1,15 @@
 import * as crud from "./crud";
-import { TASK_STATUSES } from "./constants";
+import { TASK_STATUSES, TaskStatus } from "./constants";
 
 import { Type } from "@earendil-works/pi-ai";
 import { defineTool } from "@earendil-works/pi-coding-agent";
-import { logger, toPiContent } from "../shared/utils";
-import { run as runJq } from '@gabrielbryk/jq-ts'
-import { compileSchema } from "json-schema-library";
-
+import { logger, toPiContent, toToon } from "../shared/utils";
+import { run as runJq } from "@gabrielbryk/jq-ts";
+import { compileSchema, type JsonSchema } from "json-schema-library";
 
 export function renderTodoManagerTools(taskId: string, schema: any) {
-
-  const compiledSchema = compileSchema(schema)
+  const compiledSchema = compileSchema(schema);
   const defaultData = compiledSchema.getData();
-
 
   // ---- Task (story) tools ---------------------------------------------------
   const updateTaskTool = defineTool({
@@ -38,7 +35,7 @@ export function renderTodoManagerTools(taskId: string, schema: any) {
 
         if (params.status !== undefined) changes.status = params.status;
         if (params.notes !== undefined) changes.notes = params.notes;
-        crud.updateTask(taskId, changes)
+        crud.updateTask(taskId, changes);
         return toPiContent("ok");
       } catch (e) {
         return toPiContent({ error: `error: ${(e as Error).message}` }, true);
@@ -47,28 +44,29 @@ export function renderTodoManagerTools(taskId: string, schema: any) {
   });
 
   const updateTaskData = defineTool({
-
     label: "update_task_data",
     name: "Update task data",
-    description:
-      `Update the data of the give task. Data will be checked against json-schema: """ 
+    description: `Update the data of the give task. Data will be checked against json-schema: """ 
         ${JSON.stringify(schema)}
    """}`,
     parameters: Type.Object({
       jsCommand: Type.String({
         description: `JavaScript code used with "eval" to edit the data. Assume that the object is a JS object stored in variable called data. Ex: jsCommand: 'data.hello = "world"' -> data = { "hello": "world" }`,
-      })
+      }),
     }),
-
 
     execute: async (_toolCallId, params) => {
       try {
         const before = crud.getTask(taskId)!;
         const data = before.data;
-        eval(params.jsCommand)
+        eval(params.jsCommand);
         const { valid, errors } = compiledSchema.validate(data);
+        logger.info("Data updated:")
+        logger.info(data)
         if (!valid) {
-          throw Error(`Data invalid: ${JSON.stringify(errors)}. Expected data to comply to schema ${JSON.stringify(schema)}. Example of compliant data: ${defaultData}`)
+          throw new Error(
+            `Data invalid: ${JSON.stringify(errors)}. Expected data to comply to schema ${JSON.stringify(schema)}. Example of compliant data: ${defaultData}`,
+          );
         }
         return toPiContent(crud.updateTask(taskId, { data }));
       } catch (e) {
@@ -80,24 +78,22 @@ export function renderTodoManagerTools(taskId: string, schema: any) {
   const getTaskData = defineTool({
     label: "get_task_data",
     name: "Get task data",
-    description:
-      "Search the data of the task",
+    description: "Search the data of the task",
     parameters: Type.Object({
       filter: Type.Optional(
         Type.String({
-          description: `jq-style filter for the data. Ex: data = { "a": {"b" : "c"} } | filter = ".a" | output { "b": "c" }`,
-        })
-      )
+          description: `jq-style filter for the data. To get the full data, leave empty. Ex: IF data = { "a": {"b" : "c"} } | AND filter = ".a" | THEN output { "b": "c" }`,
+        }),
+      ),
     }),
     execute: async (_toolCallId, params) => {
       const task = crud.getTask(taskId)!;
-      if (!params.filter) {
-        return toPiContent(task.data)
+      if (params.filter) {
+        return toPiContent(runJq(params.filter, task.data as any));
       } else {
-        return toPiContent(runJq(params.filter, task.data as any))
+        return toPiContent(task.data);
       }
-    }
-
+    },
   });
 
   const getSubtasksTool = defineTool({
@@ -111,7 +107,7 @@ export function renderTodoManagerTools(taskId: string, schema: any) {
           id: Type.String({}),
           title: Type.String({}),
           description: Type.String({}),
-          notes: Type.String({}),
+          result: Type.Object({}),
           status: Type.String({}),
           order: Type.Integer({}),
         }),
@@ -124,7 +120,7 @@ export function renderTodoManagerTools(taskId: string, schema: any) {
           id: it.id,
           title: it.title,
           description: it.description,
-          notes: it.notes,
+          result: it.result,
           status: it.status,
           order: it.order,
         })),
@@ -135,7 +131,8 @@ export function renderTodoManagerTools(taskId: string, schema: any) {
   const createSubtaskTool = defineTool({
     label: "create_subtask",
     name: "Create Subtask",
-    description: "Create a subtask. Requires a taskId obtained by creating task.",
+    description:
+      "Create a subtask. Requires a taskId obtained by creating task.",
     parameters: Type.Object({
       title: Type.String({ description: "Subtask title." }),
       description: Type.String({
@@ -148,6 +145,12 @@ export function renderTodoManagerTools(taskId: string, schema: any) {
             "Explicit ordering. Lower = returned first by getNextSubtask. Omit to auto-assign the next sequential order.",
         }),
       ),
+      reportSchema: Type.Optional(
+        Type.String({
+          description:
+            "JSON Schema describing the structured result this subtask reports. Omit for free-form text. Workers fill and validate their report against this schema.",
+        }),
+      ),
     }),
     execute: async (_toolCallId, params) => {
       try {
@@ -156,6 +159,7 @@ export function renderTodoManagerTools(taskId: string, schema: any) {
           description: params.description,
           taskId: taskId,
           order: params.order,
+          schema: params.reportSchema ?? "",
         });
         return toPiContent("ok");
       } catch (e: unknown) {
@@ -163,7 +167,6 @@ export function renderTodoManagerTools(taskId: string, schema: any) {
       }
     },
   });
-
 
   const updateSubtaskManagerTool = defineTool({
     label: "update_subtask_manager",
@@ -194,35 +197,48 @@ export function renderTodoManagerTools(taskId: string, schema: any) {
     },
   });
 
-  return { updateTaskTool, updateTaskData, getTaskData, getSubtasksTool, createSubtaskTool, updateSubtaskManagerTool }
+
+  return {
+    updateTaskTool,
+    updateTaskData,
+    getTaskData,
+    getSubtasksTool,
+    createSubtaskTool,
+    updateSubtaskManagerTool,
+  };
 }
-
-
-export function renderTodoWorkerTools(subtaskId: string) {
-  const updateSubtaskWorkerTool = defineTool({
-    label: "update_subtask_worker",
-    name: "Update Subtask (worker)",
+export function renderTodoWorkerTools(subtaskId: string, schema: object) {
+  const workerResultTool = defineTool({
+    label: "worker_result",
+    name: "Result reporting by the worker",
     description:
-      "Update a subtask's status and notes in one call. Use to reflect daily work: 'todo' | 'in-progress' | 'done'. Empty notes clears the notes.",
+      "Report this subtask's result. The result is validated against the JSON schema stored on the subtask; an invalid report fails the call.",
     parameters: Type.Object({
-      status: Type.Enum(TASK_STATUSES, {
-        description: "New status: 'todo' | 'in-progress' | 'done'.",
-      }),
-      notes: Type.String({
-        description: "New notes text. Empty string clears the notes.",
+      resultJSON: Type.String({
+        description: `The structured result of the work. Has to match schema ${schema}`,
       }),
     }),
-    execute: async (_toolCallId, params) => {
-      try {
-        // empty-string notes = "no notes", so it does not overwrite the existing
-        // handoff notes (which would otherwise make the manager's handoff prompt
-        // dead and strand the worker on the same subtask forever).
-        const changes: { status: string; notes?: string } = {
-          status: params.status,
-        };
-        if (params.notes && params.notes !== "") changes.notes = params.notes;
 
-        await crud.updateSubtask(subtaskId, changes);
+    execute: async (_toolCallId, params, _signal, _onUpdate, ctx) => {
+      try {
+        const subtask = crud.getSubtask(subtaskId);
+        if (!subtask) {
+          throw new Error(`No subtask with id ${subtaskId}`);
+        }
+        const data = params.resultJSON;
+        const compiled = compileSchema(subtask.schema as any);
+        const { valid, errors, annotations } = compiled.validate(JSON.parse(data));
+        logger.info(annotations)
+        if (!valid) {
+          throw Error(
+            `Result invalid: ${JSON.stringify(errors)} .Expected data to comply to schema ${JSON.stringify(subtask.schema)}.Example of compliant data: ${compiled.getData()}`,
+          );
+        }
+        await crud.updateSubtask(subtaskId, {
+          status: "done",
+          result: data,
+        });
+        ctx.abort();
         return toPiContent("ok");
       } catch (e) {
         return toPiContent({ error: (e as Error).message }, true);
@@ -230,8 +246,5 @@ export function renderTodoWorkerTools(subtaskId: string) {
     },
   });
 
-  return { updateSubtaskWorkerTool }
+  return { workerResultTool };
 }
-
-
-

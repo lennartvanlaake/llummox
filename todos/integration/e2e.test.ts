@@ -5,7 +5,6 @@ import {
   workOnPlan,
 } from "../agents";
 import { listSubtasks, listTasks } from "../crud.ts";
-// ponytail: `ai`/`@ai-sdk` removed — telemetry registration dropped from tests.
 
 describe("Test the todo worker agent", () => {
   beforeEach(() => {
@@ -14,15 +13,24 @@ describe("Test the todo worker agent", () => {
 
   // findings: relative/absolute path issues
   it("Pi worker agent does actual work", async () => {
-    const piWorker = await createPiWorkerAgent({
-      cwd: "/tmp",
-    });
 
     await workOnPlan([
       {
         prompt: "Create subtasks for calculating 1+1, 1+2 and 2+2.",
-        worker: piWorker,
+        worker: {
+          cwd: "/tmp",
+        },
         cwd: "/tmp",
+        schema: `
+        {
+          "type": "object",
+          "properties": {
+            "result": {
+              "type": "string"
+            }
+          },
+        }
+        `
       },
     ]);
 

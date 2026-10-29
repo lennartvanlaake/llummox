@@ -9,6 +9,7 @@ import {
 import { db } from "./db";
 import { randomUUIDv7 } from "bun";
 import { TaskStatus } from "./constants";
+import { compileSchema } from "json-schema-library";
 
 //
 // ---- Tasks ----
@@ -31,7 +32,6 @@ export async function updateTask(id: string, input: Partial<TasksInsert>) {
     throw new Error(`Task with id ${id} does not exist`);
   }
   const merged = { ...task, ...input };
-  debugger;
   return (
     await db
       .update(tasksTable)
@@ -132,19 +132,28 @@ export function getNextSubtask(taskId: string) {
   return null;
 }
 
-
 export async function createSubtask(
   values: Omit<SubtasksInsert, "id" | "status">,
 ) {
-  const lastMax = db.select({ value: max(subtasksTable.order) }).from(subtasksTable).where(eq(subtasksTable.taskId, values.taskId)).get()?.value
-  const order = lastMax === null || lastMax === undefined ? 0 : lastMax! + 1
+
+  try {
+    compileSchema(JSON.parse(values.schema as string) as any, { throwOnInvalidSchema: true })
+  } catch (e) {
+    throw new Error(`JSON schema provided in schema is incorrect. ${(e as any).message}`)
+  }
+  const lastMax = db
+    .select({ value: max(subtasksTable.order) })
+    .from(subtasksTable)
+    .where(eq(subtasksTable.taskId, values.taskId))
+    .get()?.value;
+  const order = lastMax === null || lastMax === undefined ? 0 : lastMax! + 1;
   const insert = await db
     .insert(subtasksTable)
     .values({
       id: randomUUIDv7(),
       status: TaskStatus["todo"],
       order,
-      ...values
+      ...values,
     })
     .returning();
   return insert.at(0)!;
