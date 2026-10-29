@@ -7,9 +7,14 @@ import { logger, toPiContent, toToon } from "../shared/utils";
 import { run as runJq } from "@gabrielbryk/jq-ts";
 import { compileSchema, type JsonSchema } from "json-schema-library";
 
-export function renderTodoManagerTools(taskId: string, schema: any) {
-  const compiledSchema = compileSchema(schema);
-  const defaultData = compiledSchema.getData();
+
+export function renderTodoManagerTools(taskId: string, schema: string) {
+
+  const { Schema } = Type.Script(schema) as any;
+  console.log(JSON.stringify(Schema))
+  const compiledSchema = compileSchema(Schema);
+  // const compiledSchema = TypeCompiler.Compile(Schema);
+
 
   // ---- Task (story) tools ---------------------------------------------------
   const updateTaskTool = defineTool({
@@ -58,14 +63,15 @@ export function renderTodoManagerTools(taskId: string, schema: any) {
     execute: async (_toolCallId, params) => {
       try {
         const before = crud.getTask(taskId)!;
-        const data = before.data;
+        let data = before.data;
         eval(params.jsCommand);
         const { valid, errors } = compiledSchema.validate(data);
+        // const errors = [...compiledSchema.Errors(data)];
         logger.info("Data updated:")
         logger.info(data)
-        if (!valid) {
+        if (errors.length > 0) {
           throw new Error(
-            `Data invalid: ${JSON.stringify(errors)}. Expected data to comply to schema ${JSON.stringify(schema)}. Example of compliant data: ${defaultData}`,
+            `Data invalid: ${JSON.stringify(errors)}. Expected data to comply to schema ${schema}.`,
           );
         }
         return toPiContent(crud.updateTask(taskId, { data }));
@@ -148,7 +154,7 @@ export function renderTodoManagerTools(taskId: string, schema: any) {
       reportSchema: Type.Optional(
         Type.String({
           description:
-            "JSON Schema describing the structured result this subtask reports. Omit for free-form text. Workers fill and validate their report against this schema.",
+            "TS-Schema for validating data. Use `type Schema = { prop: type }` syntax. Workers fill and validate their report against this schema.",
         }),
       ),
     }),

@@ -38,6 +38,7 @@ describe("crud subtasks", () => {
     const st = await crud.createSubtask({
       title: "S2",
       description: "d",
+      schema: "type Schema = { a: string }",
       taskId: task.id,
     });
     expect(st.id).toBeTruthy();
@@ -69,5 +70,18 @@ describe("crud subtasks", () => {
     expect(await crud.deleteSubtask(st.id)).toBe(true);
     expect(await crud.listSubtasks(task.id)).toHaveLength(2);
     expect(await crud.deleteSubtask(st.id)).toBe(false);
+  });
+  it("Ts check", async () => {
+    db = setupDatabase(":memory:");
+    const task = await crud.createTask({
+      prompt: "T",
+    });
+
+    const st = await crud.createSubtask({
+      title: "S2",
+      description: "d",
+      schema: "foobar",
+      taskId: task.id,
+    });
   });
 });

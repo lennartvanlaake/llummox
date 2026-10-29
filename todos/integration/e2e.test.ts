@@ -22,15 +22,11 @@ describe("Test the todo worker agent", () => {
         },
         cwd: "/tmp",
         schema: `
-        {
-          "type": "object",
-          "properties": {
-            "result": {
-              "type": "string"
-            }
-          },
+           type Schema = {
+            results: number[],
         }
-        `
+        `,
+        type: "read"
       },
     ]);
 

@@ -24,9 +24,9 @@ export const subtasksTable = sqliteTable("subtasks", {
   description: text().notNull(),
   // ponytail: JSON text column; the per-subtask report schema written by the
   // manager at creation. Empty string when none was provided.
-  schema: text({ mode: "json" }),
+  schema: text(),
   // ponytail: the worker's structured report, validated against `schema`
-  result: text({ mode: "json" }).default(null),
+  result: text(),
   createdAt: integer().notNull().default(CURRENT_TIMESTAMP),
   // ponytail: base value; the per-task next-sequence (max+1) is assigned in
   // crud.createSubtask where subtasksTable is already in scope. Keeping the

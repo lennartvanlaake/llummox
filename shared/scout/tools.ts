@@ -69,6 +69,23 @@ export const searchHtml = defineTool({
   },
 });
 
+export function renderLsTool(dir: string) {
+  return defineTool({
+    description:
+      "ls",
+    name: "ls_tool",
+    label: "ls_tool",
+    parameters: Type.Object({
+      path: Type.String(),
+    }),
+    execute: async (_, params) => {
+      return toPiContent(await sandboxCommand(`ls ${params.path}`, params.path));
+    },
+  });
+}
+
+
+
 export const readLines = defineTool({
   description: "Reads specified lines from a file",
   name: "read_lines",

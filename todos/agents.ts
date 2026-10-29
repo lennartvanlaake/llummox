@@ -27,14 +27,15 @@ export type TaskConfig = {
   prompt: string;
   worker: PiAgentOptions;
   manager?: PiAgentOptions;
-  schema: any;
+  schema?: any;
+  type: "read" | "write"
 };
 
 const defaultPiOptions = { cwd: "/tmp" };
 
 const managerSystemPrompt = `You are an expect delegator. Create subtasks with conside descriptions. Be terse, no fluff, politeness or exclamations. Simplify and shorten language use. Use the createSubtask tool for delegation. Your chat responses are irrelevant, answer ".". EXTREMELY IMPORTANT: You are not allowed under any circumstance to complete the subtasks yourself.`;
 
-export const workerSystemPrompt = `You are a worker. You focus on executing the subtask as quickly as possible. You are part of a team that is executing a larger task. Use this only as context, do NOT do work outside of your subtask. If asked or needed, use your "updateSubtask" tool to report about your progress by editing notes. Change status to done if you are done, to "in-progress" if you finish without completing the subtask`;
+export const workerSystemPrompt = `You are a worker. You focus on executing the subtask as quickly as possible. You are part of a team that is executing a larger task. Use this only as context, do NOT do work outside of your subtask.`;
 
 const summarizerSystemPrompt = `You are an expect summarizer. Use the updateData and getData tools to take the notes from the subtasks and convert them into a data object described by the requested schema. Your chat respones are irrelevant, answer ".". `;
 
@@ -82,7 +83,7 @@ export function createSummarizerAgent(
   return createPiSession({
     cwd: options.cwd,
     tools: [updateTaskData, getTaskData, ...(options?.tools ?? [])],
-    systemPrompt: `${summarizerSystemPrompt}.  The data object must comply with the following schema ${JSON.stringify(schema)}. ${options.systemPromptAppend ?? ""}`,
+    systemPrompt: `${summarizerSystemPrompt}.  The data object must comply with the following schema ${schema}. ${options.systemPromptAppend ?? ""}`,
     builtinTools: options.builtinTools ?? [],
   });
 }
@@ -100,12 +101,18 @@ export async function createTaskWithSubs(
   });
 
   const agent = await createManagerAgent(taskConfig.manager, schema, task.id);
-  const prompt = `${taskConfig.prompt} ${previousTask ? `. The notes from the previous task with prompt ${previousTask!.prompt} are ${previousTask!.notes}. ` : ""}`;
 
-  await agent.prompt(
-    prompt +
-    `When combined, the result of all subtasks MUST be sufficient complete the schema: ${JSON.stringify(schema)}. Add JSON-schemas to your subtasks so your workers know how to format their results`,
-  );
+  let prompt = taskConfig.prompt
+
+  if (previousTask) {
+    prompt += `The data from the previous task with prompt ${previousTask!.prompt} is ${JSON.stringify(previousTask!.data)}. `
+  }
+
+  if (taskConfig.type == "read") {
+    prompt += `When combined, the result of all subtasks MUST be sufficient complete the schema: ${schema}. Add TypeScript schemas to your subtasks so your workers know how to format their results. Format: """type Schema = { prop: type }"""`
+  }
+
+  await agent.prompt(prompt);
 
   // double check that subtasks are actually generated
   if (listSubtasks(task.id).length == 0) {
@@ -148,7 +155,7 @@ async function summarize(task: TasksRow, schema: any) {
     .join("");
 
   await agent.prompt(
-    `Use updateTaskData to fill the data with the output of the following subtasks. Subtasks: ${subtasksTemplate}. The data should conform to schema ${JSON.stringify(schema)}`,
+    `Use updateTaskData to fill the data with the output of the following subtasks. Subtasks: ${subtasksTemplate}. The data should conform to schema ${schema}`,
   );
 
   return getTask(task.id);
@@ -167,7 +174,6 @@ export async function workOnTask(
   previousTask?: TasksRow,
 ) {
   let loopCount = 0;
-  debugger;
   const task = await createTaskWithSubs(
     taskConfig,
     taskConfig.schema,
@@ -192,7 +198,7 @@ export async function workOnTask(
     subtask = getNextSubtask(task.id);
     loopCount++;
     if (loopCount > 50) {
-      return
+      return task
     }
   }
 

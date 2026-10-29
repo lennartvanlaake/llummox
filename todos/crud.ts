@@ -1,4 +1,5 @@
 import { eq, and, max } from "drizzle-orm";
+import { Type } from "@earendil-works/pi-ai";
 import {
   tasksTable,
   subtasksTable,
@@ -10,6 +11,7 @@ import { db } from "./db";
 import { randomUUIDv7 } from "bun";
 import { TaskStatus } from "./constants";
 import { compileSchema } from "json-schema-library";
+import { logger } from "../shared/utils";
 
 //
 // ---- Tasks ----
@@ -135,11 +137,16 @@ export function getNextSubtask(taskId: string) {
 export async function createSubtask(
   values: Omit<SubtasksInsert, "id" | "status">,
 ) {
-
   try {
-    compileSchema(JSON.parse(values.schema as string) as any, { throwOnInvalidSchema: true })
+    if (values.schema) {
+      const schemaResult = Type.Script(values.schema)
+      if (!schemaResult.hasOwnProperty("Schema")) {
+        throw new Error("Schema must be defied as ```type Schema = ...```. Found " + values.schema)
+      }
+      logger.info(schemaResult)
+    }
   } catch (e) {
-    throw new Error(`JSON schema provided in schema is incorrect. ${(e as any).message}`)
+    throw new Error(`TS schema provided in schema is incorrect. ${(e as any).message}`)
   }
   const lastMax = db
     .select({ value: max(subtasksTable.order) })
