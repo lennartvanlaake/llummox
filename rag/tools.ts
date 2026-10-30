@@ -13,14 +13,14 @@ export type KnowledgeConfig = {
 export async function initRagTool(dbPath: string, configs: KnowledgeConfig[]) {
   setupDatabase(dbPath);
 
-  for (const c of configs) {
-    await addDirectoryToRag(c.dir, c.subject);
-  }
+  // for (const c of configs) {
+  //   await addDirectoryToRag(c.dir, c.subject);
+  // }
 
   const subjects = [...new Set(configs.map((c) => c.subject))];
 
   return defineTool({
-    label: "search_rag",
+    label: "search_knowledge",
     name: "Search Rag",
     description:
       "Look up information about a library, topic, or concept from the RAG corpus. Use when the agent needs reference material.",

@@ -1,7 +1,6 @@
 import { describe, it, expect, beforeEach } from "bun:test";
 import { setupDatabase } from "../db";
 import {
-  createPiWorkerAgent,
   workOnPlan,
 } from "../agents";
 import { listSubtasks, listTasks } from "../crud.ts";

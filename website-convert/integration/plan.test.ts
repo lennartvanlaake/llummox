@@ -1,4 +1,4 @@
-import { test, expect, describe, beforeEach } from "bun:test";
+import { test, describe, beforeEach } from "bun:test";
 import { $ } from "bun"
 import { run } from ".."
 // test("test on mvk website", async () => {
@@ -11,16 +11,28 @@ import { run } from ".."
 
 test("test planning on very small project", async () => {
   $.cwd(import.meta.dir);
-  const db = "tuesday.db"
+  const db = "mvk.db"
   await $`cp rag-seed.db ${db}`;
   await run({
-    project: "tuesday",
+    project: "mvk",
     projectsBase: `${import.meta.dir}/fixtures`,
-    url: "https://isittuesday.org",
+    url: "https://www.mvk.edu.in",
     db: `${import.meta.dir}/${db}`
   });
   await $`rm ${db}`;
 }, 0);
+// test("test planning on very small project", async () => {
+//   $.cwd(import.meta.dir);
+//   const db = "tuesday.db"
+//   await $`cp rag-seed.db ${db}`;
+//   await run({
+//     project: "tuesday",
+//     projectsBase: `${import.meta.dir}/fixtures`,
+//     url: "https://isittuesday.org",
+//     db: `${import.meta.dir}/${db}`
+//   });
+//   await $`rm ${db}`;
+// }, 0);
 // test("test planning on very small project", async () => {
 //   $.cwd(import.meta.dir);
 //   const db = "leer.db"

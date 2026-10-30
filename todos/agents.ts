@@ -12,15 +12,18 @@ import type { SubtasksRow, TasksRow } from "./schema.ts";
 import type {
   AgentSession,
   ToolDefinition,
+  InlineExtension
 } from "@earendil-works/pi-coding-agent";
 import { createPiSession } from "../shared/pi.ts";
 import { compileSchema } from "json-schema-library";
+import { renderHurryUpExtension } from "../shared/extensions.ts";
 
 type PiAgentOptions = {
   cwd: string;
   systemPromptAppend?: string;
   tools?: ToolDefinition[];
   builtinTools?: string[];
+  extensions?: InlineExtension[];
 };
 export type TaskConfig = {
   cwd: string;
@@ -39,6 +42,14 @@ export const workerSystemPrompt = `You are a worker. You focus on executing the 
 
 const summarizerSystemPrompt = `You are an expect summarizer. Use the updateData and getData tools to take the notes from the subtasks and convert them into a data object described by the requested schema. Your chat respones are irrelevant, answer ".". `;
 
+
+const workerHurryUpExtension = renderHurryUpExtension({
+  warnLimit: 10,
+  warnMessage: "You are taking too long. Either report findings or raise a blocker soon. Nearing limit:",
+  cutoffLimit: 14,
+  cutoffMessage: "Report fidnings or raise blocker NOW"
+})
+
 export function createPiWorkerAgent(
   options: PiAgentOptions = defaultPiOptions,
   subtaskId: string,
@@ -54,6 +65,7 @@ export function createPiWorkerAgent(
     tools: [workerResultTool, ...(options?.tools ?? [])],
     systemPrompt: `${workerSystemPrompt} ${options.systemPromptAppend ?? ""}`,
     builtinTools: options.builtinTools ?? [],
+    extensionFactories: [workerHurryUpExtension]
   });
 }
 
@@ -93,11 +105,8 @@ export async function createTaskWithSubs(
   schema: any,
   previousTask?: TasksRow,
 ) {
-  const compiled = compileSchema(schema);
-  const defaultData = compiled.getData();
   const task = await createTask({
     prompt: taskConfig.prompt,
-    data: defaultData,
   });
 
   const agent = await createManagerAgent(taskConfig.manager, schema, task.id);
@@ -105,7 +114,7 @@ export async function createTaskWithSubs(
   let prompt = taskConfig.prompt
 
   if (previousTask) {
-    prompt += `The data from the previous task with prompt ${previousTask!.prompt} is ${JSON.stringify(previousTask!.data)}. `
+    prompt += `The data from the previous task is """${JSON.stringify(previousTask!.data)}""". `
   }
 
   if (taskConfig.type == "read") {
@@ -142,7 +151,7 @@ export async function doWork(
     subtask.status == TaskStatus.todo
       ? ""
       : `You are not the first worker to tackle this task. Status: ${subtask.status}. Prior result: ${subtask.result ?? "none"}.`;
-  const prompt = `The team is working on the larger task (CONTEXT ONLY): "${task.prompt}". Your subtask is "${subtask.title} - ${subtask.description} and has id ${subtask.id}. ${notesPrompt}.`;
+  const prompt = `The team is working on the larger task (CONTEXT ONLY): "${task.prompt}". Your subtask is "${subtask.title} - ${subtask.description}. ${notesPrompt}.`;
   await agent.prompt(prompt);
 }
 

@@ -10,7 +10,6 @@ import {
 import { db } from "./db";
 import { randomUUIDv7 } from "bun";
 import { TaskStatus } from "./constants";
-import { compileSchema } from "json-schema-library";
 import { logger } from "../shared/utils";
 
 //

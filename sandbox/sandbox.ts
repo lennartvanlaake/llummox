@@ -24,7 +24,7 @@ function sandboxTemplate(sandboxDir: string) {
 `;
 }
 
-export async function sandboxCommand(sandboxDir: string, command: string) {
+export async function sandboxCommand(sandboxDir: string, command: string): Promise<string> {
   // ponytail: collapse to a single line so node's sh -c doesn't split the
   // bwrap options across argv entries (multiline keeps "--chdir /path exit 3"
   // as separate tokens, which execvp can't resolve).

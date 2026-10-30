@@ -3,18 +3,13 @@ import { TASK_STATUSES, TaskStatus } from "./constants";
 
 import { Type } from "@earendil-works/pi-ai";
 import { defineTool } from "@earendil-works/pi-coding-agent";
-import { logger, toPiContent, toToon } from "../shared/utils";
+import { logger, toPiContent } from "../shared/utils";
 import { run as runJq } from "@gabrielbryk/jq-ts";
-import { compileSchema, type JsonSchema } from "json-schema-library";
+import { compileSchema } from "json-schema-library";
 
+export function renderTodoManagerTools(taskId: string, schema?: string) {
 
-export function renderTodoManagerTools(taskId: string, schema: string) {
-
-  const { Schema } = Type.Script(schema) as any;
-  console.log(JSON.stringify(Schema))
-  const compiledSchema = compileSchema(Schema);
-  // const compiledSchema = TypeCompiler.Compile(Schema);
-
+  const compiledSchema = schema ? compileSchema((Type.Script(schema) as any).Schema) : null;
 
   // ---- Task (story) tools ---------------------------------------------------
   const updateTaskTool = defineTool({
@@ -52,7 +47,7 @@ export function renderTodoManagerTools(taskId: string, schema: string) {
     label: "update_task_data",
     name: "Update task data",
     description: `Update the data of the give task. Data will be checked against json-schema: """ 
-        ${JSON.stringify(schema)}
+        ${schema}
    """}`,
     parameters: Type.Object({
       jsCommand: Type.String({
@@ -65,14 +60,16 @@ export function renderTodoManagerTools(taskId: string, schema: string) {
         const before = crud.getTask(taskId)!;
         let data = before.data;
         eval(params.jsCommand);
-        const { valid, errors } = compiledSchema.validate(data);
-        // const errors = [...compiledSchema.Errors(data)];
-        logger.info("Data updated:")
-        logger.info(data)
-        if (errors.length > 0) {
-          throw new Error(
-            `Data invalid: ${JSON.stringify(errors)}. Expected data to comply to schema ${schema}.`,
-          );
+        if (compiledSchema) {
+          const { valid, errors } = compiledSchema.validate(data);
+          // const errors = [...compiledSchema.Errors(data)];
+          logger.info("Data updated:")
+          logger.info(data)
+          if (errors.length > 0) {
+            throw new Error(
+              `Data invalid: ${JSON.stringify(errors)}. Expected data to comply to schema ${schema}.`,
+            );
+          }
         }
         return toPiContent(crud.updateTask(taskId, { data }));
       } catch (e) {
@@ -167,7 +164,8 @@ export function renderTodoManagerTools(taskId: string, schema: string) {
           order: params.order,
           schema: params.reportSchema ?? "",
         });
-        return toPiContent("ok");
+        const subtasks = crud.listSubtasks(taskId).map(it => `id: ${it.id} title: ${it.title}`).join(",")
+        return toPiContent(`Success. Current subtasks: ${subtasks}`);
       } catch (e: unknown) {
         return toPiContent({ error: (e as Error).message });
       }
@@ -213,7 +211,9 @@ export function renderTodoManagerTools(taskId: string, schema: string) {
     updateSubtaskManagerTool,
   };
 }
-export function renderTodoWorkerTools(subtaskId: string, schema: object) {
+export function renderTodoWorkerTools(subtaskId: string, schema?: string) {
+
+  const compiledSchema = schema ? compileSchema((Type.Script(schema) as any).Schema) : null;
   const workerResultTool = defineTool({
     label: "worker_result",
     name: "Result reporting by the worker",
@@ -232,13 +232,15 @@ export function renderTodoWorkerTools(subtaskId: string, schema: object) {
           throw new Error(`No subtask with id ${subtaskId}`);
         }
         const data = params.resultJSON;
-        const compiled = compileSchema(subtask.schema as any);
-        const { valid, errors, annotations } = compiled.validate(JSON.parse(data));
-        logger.info(annotations)
-        if (!valid) {
-          throw Error(
-            `Result invalid: ${JSON.stringify(errors)} .Expected data to comply to schema ${JSON.stringify(subtask.schema)}.Example of compliant data: ${compiled.getData()}`,
-          );
+        if (compiledSchema) {
+          // is this working?
+          const { valid, errors, annotations } = compiledSchema.validate(JSON.parse(data));
+          logger.info(annotations)
+          if (!valid) {
+            throw Error(
+              `Result invalid: ${JSON.stringify(errors)} .Expected data to comply to schema ${JSON.stringify(subtask.schema)}.Example of compliant data: ${compiledSchema.getData()}`,
+            );
+          }
         }
         await crud.updateSubtask(subtaskId, {
           status: "done",
@@ -252,5 +254,34 @@ export function renderTodoWorkerTools(subtaskId: string, schema: object) {
     },
   });
 
-  return { workerResultTool };
+  const reportBlock = defineTool({
+    label: "report_blocker",
+    name: "Worker reporting a blocking issue",
+    description:
+      "Use this when the result asked for cannot be provided. This may be because your tools are insufficient or the task given does not match reality",
+    parameters: Type.Object({
+      blockedReason: Type.String({
+        description: `What is blocking the completion of your task`,
+      }),
+    }),
+
+    execute: async (_toolCallId, params, _signal, _onUpdate, ctx) => {
+      try {
+        await crud.updateSubtask(subtaskId, {
+          status: TaskStatus.blocked,
+          result: params.blockedReason
+        });
+        logger.error(params.blockedReason)
+        ctx.abort();
+        return toPiContent("ok");
+      } catch (e) {
+        return toPiContent({ error: (e as Error).message }, true);
+      }
+    }
+  })
+
+  return { workerResultTool, reportBlock };
 }
+
+
+

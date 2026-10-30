@@ -3,6 +3,7 @@ import {
   DefaultResourceLoader,
   ModelRuntime,
   type ToolDefinition,
+  type InlineExtension
 } from "@earendil-works/pi-coding-agent";
 import { logger } from "../shared/utils";
 
@@ -12,6 +13,7 @@ export type PiSessionConfig = {
   systemPrompt: string;
   tools?: ToolDefinition[];
   builtinTools?: string[];
+  extensionFactories?: InlineExtension[];
 };
 
 export async function createPiSession(config: PiSessionConfig) {
@@ -27,6 +29,7 @@ export async function createPiSession(config: PiSessionConfig) {
           pi.registerTool(tool)
         }
       },
+      ...(config.extensionFactories ?? [])
     ],
   });
 
