@@ -11,7 +11,7 @@ describe("Test the todo worker agent", () => {
   });
 
   // findings: relative/absolute path issues
-  it("Pi worker agent does actual work", async () => {
+  it("worker agent does actual work", async () => {
 
     await workOnPlan([
       {

@@ -1,19 +1,26 @@
 import * as crud from "./crud";
 import { TASK_STATUSES, TaskStatus } from "./constants";
 
-import { Type } from "@earendil-works/pi-ai";
-import { defineTool } from "@earendil-works/pi-coding-agent";
-import { logger, toPiContent } from "../shared/utils";
+import {
+  defineTool,
+  stringEnum,
+  toToolResult,
+  Type,
+} from "../shared/agent/tools";
+import { parseTsSchema } from "../shared/agent/schema";
+import { logger } from "../shared/utils";
 import { run as runJq } from "@gabrielbryk/jq-ts";
 import { compileSchema } from "json-schema-library";
 
-export function renderTodoManagerTools(taskId: string, schema?: string) {
+function compileReportSchema(schema?: string) {
+  return schema ? compileSchema(parseTsSchema(schema) as any) : null;
+}
 
-  const compiledSchema = schema ? compileSchema((Type.Script(schema) as any).Schema) : null;
+export function renderTodoManagerTools(taskId: string, schema?: string) {
+  const compiledSchema = compileReportSchema(schema);
 
   // ---- Task (story) tools ---------------------------------------------------
   const updateTaskTool = defineTool({
-    label: "update_task",
     name: "Update task",
     description:
       "Update fields of a task (story). Providing a field changes it; omit it to leave it unchanged. Empty string clears a text field.",
@@ -25,7 +32,7 @@ export function renderTodoManagerTools(taskId: string, schema?: string) {
         Type.String({ description: "New notes. Omit to leave unchanged." }),
       ),
     }),
-    execute: async (_toolCallId, params) => {
+    execute: async (params) => {
       try {
         const before = crud.getTask(taskId)!;
         const changes = {
@@ -36,15 +43,17 @@ export function renderTodoManagerTools(taskId: string, schema?: string) {
         if (params.status !== undefined) changes.status = params.status;
         if (params.notes !== undefined) changes.notes = params.notes;
         crud.updateTask(taskId, changes);
-        return toPiContent("ok");
+        return toToolResult("ok");
       } catch (e) {
-        return toPiContent({ error: `error: ${(e as Error).message}` }, true);
+        return toToolResult(
+          { error: `error: ${(e as Error).message}` },
+          true,
+        );
       }
     },
   });
 
   const updateTaskData = defineTool({
-    label: "update_task_data",
     name: "Update task data",
     description: `Update the data of the give task. Data will be checked against json-schema: """ 
         ${schema}
@@ -55,31 +64,32 @@ export function renderTodoManagerTools(taskId: string, schema?: string) {
       }),
     }),
 
-    execute: async (_toolCallId, params) => {
+    execute: async (params) => {
       try {
         const before = crud.getTask(taskId)!;
         let data = before.data;
         eval(params.jsCommand);
         if (compiledSchema) {
-          const { valid, errors } = compiledSchema.validate(data);
-          // const errors = [...compiledSchema.Errors(data)];
-          logger.info("Data updated:")
-          logger.info(data)
+          const { errors } = compiledSchema.validate(data);
+          logger.info("Data updated:");
+          logger.info(data);
           if (errors.length > 0) {
             throw new Error(
               `Data invalid: ${JSON.stringify(errors)}. Expected data to comply to schema ${schema}.`,
             );
           }
         }
-        return toPiContent(crud.updateTask(taskId, { data }));
+        return toToolResult(crud.updateTask(taskId, { data }));
       } catch (e) {
-        return toPiContent(`error: ${(e as Error).message}`, true);
+        return toToolResult(
+          `error: ${(e as Error).message}`,
+          true,
+        );
       }
     },
   });
 
   const getTaskData = defineTool({
-    label: "get_task_data",
     name: "Get task data",
     description: "Search the data of the task",
     parameters: Type.Object({
@@ -89,36 +99,23 @@ export function renderTodoManagerTools(taskId: string, schema?: string) {
         }),
       ),
     }),
-    execute: async (_toolCallId, params) => {
+    execute: async (params) => {
       const task = crud.getTask(taskId)!;
       if (params.filter) {
-        return toPiContent(runJq(params.filter, task.data as any));
+        return toToolResult(runJq(params.filter, task.data as any));
       } else {
-        return toPiContent(task.data);
+        return toToolResult(task.data as any);
       }
     },
   });
 
   const getSubtasksTool = defineTool({
-    label: "get_subtasks",
     name: "Get Subtasks",
     description: "Gets all subtasks of a task",
-    parameters: Type.Null,
-    outputSchema: Type.Object({
-      subtasks: Type.Array(
-        Type.Object({
-          id: Type.String({}),
-          title: Type.String({}),
-          description: Type.String({}),
-          result: Type.Object({}),
-          status: Type.String({}),
-          order: Type.Integer({}),
-        }),
-      ),
-    }),
+    parameters: Type.Null(),
     execute: async () => {
       const subtasks = crud.listSubtasks(taskId) ?? [];
-      return toPiContent({
+      return toToolResult({
         subtasks: subtasks.map((it) => ({
           id: it.id,
           title: it.title,
@@ -132,7 +129,6 @@ export function renderTodoManagerTools(taskId: string, schema?: string) {
   });
 
   const createSubtaskTool = defineTool({
-    label: "create_subtask",
     name: "Create Subtask",
     description:
       "Create a subtask. Requires a taskId obtained by creating task.",
@@ -155,7 +151,7 @@ export function renderTodoManagerTools(taskId: string, schema?: string) {
         }),
       ),
     }),
-    execute: async (_toolCallId, params) => {
+    execute: async (params) => {
       try {
         await crud.createSubtask({
           title: params.title,
@@ -164,28 +160,30 @@ export function renderTodoManagerTools(taskId: string, schema?: string) {
           order: params.order,
           schema: params.reportSchema ?? "",
         });
-        const subtasks = crud.listSubtasks(taskId).map(it => `id: ${it.id} title: ${it.title}`).join(",")
-        return toPiContent(`Success. Current subtasks: ${subtasks}`);
+        const subtasks = crud
+          .listSubtasks(taskId)
+          .map((it) => `id: ${it.id} title: ${it.title}`)
+          .join(",");
+        return toToolResult(`Success. Current subtasks: ${subtasks}`);
       } catch (e: unknown) {
-        return toPiContent({ error: (e as Error).message });
+        return toToolResult({ error: (e as Error).message }, true);
       }
     },
   });
 
   const updateSubtaskManagerTool = defineTool({
-    label: "update_subtask_manager",
     name: "Update Subtask (manager)",
     description:
       "Update a subtask's status and notes in one call. Use to reflect daily work: 'todo' | 'in-progress' | 'done'. Empty notes clears the notes.",
     parameters: Type.Object({
       subtaskId: Type.String({ description: "Subtask id to update." }),
-      status: Type.Enum(TASK_STATUSES, {
+      status: stringEnum(TASK_STATUSES, {
         description: "New status: 'todo' | 'in-progress' | 'done'.",
       }),
       title: Type.String({ description: "New title text." }),
       description: Type.String({ description: "New description text." }),
     }),
-    execute: async (_toolCallId, params) => {
+    execute: async (params) => {
       try {
         const changes = {
           status: params.status,
@@ -194,13 +192,12 @@ export function renderTodoManagerTools(taskId: string, schema?: string) {
         };
 
         await crud.updateSubtask(params.subtaskId, changes);
-        return toPiContent("ok");
+        return toToolResult("ok");
       } catch (e) {
-        return toPiContent({ error: (e as Error).message }, true);
+        return toToolResult({ error: (e as Error).message }, true);
       }
     },
   });
-
 
   return {
     updateTaskTool,
@@ -211,11 +208,11 @@ export function renderTodoManagerTools(taskId: string, schema?: string) {
     updateSubtaskManagerTool,
   };
 }
-export function renderTodoWorkerTools(subtaskId: string, schema?: string) {
 
-  const compiledSchema = schema ? compileSchema((Type.Script(schema) as any).Schema) : null;
+export function renderTodoWorkerTools(subtaskId: string, schema?: string) {
+  const compiledSchema = compileReportSchema(schema);
+
   const workerResultTool = defineTool({
-    label: "worker_result",
     name: "Result reporting by the worker",
     description:
       "Report this subtask's result. The result is validated against the JSON schema stored on the subtask; an invalid report fails the call.",
@@ -225,7 +222,7 @@ export function renderTodoWorkerTools(subtaskId: string, schema?: string) {
       }),
     }),
 
-    execute: async (_toolCallId, params, _signal, _onUpdate, ctx) => {
+    execute: async (params, ctx) => {
       try {
         const subtask = crud.getSubtask(subtaskId);
         if (!subtask) {
@@ -233,9 +230,10 @@ export function renderTodoWorkerTools(subtaskId: string, schema?: string) {
         }
         const data = params.resultJSON;
         if (compiledSchema) {
-          // is this working?
-          const { valid, errors, annotations } = compiledSchema.validate(JSON.parse(data));
-          logger.info(annotations)
+          const { valid, errors, annotations } = compiledSchema.validate(
+            JSON.parse(data),
+          );
+          logger.info(annotations);
           if (!valid) {
             throw Error(
               `Result invalid: ${JSON.stringify(errors)} .Expected data to comply to schema ${JSON.stringify(subtask.schema)}.Example of compliant data: ${compiledSchema.getData()}`,
@@ -246,16 +244,15 @@ export function renderTodoWorkerTools(subtaskId: string, schema?: string) {
           status: "done",
           result: data,
         });
-        ctx.abort();
-        return toPiContent("ok");
+        ctx.stop();
+        return toToolResult("ok");
       } catch (e) {
-        return toPiContent({ error: (e as Error).message }, true);
+        return toToolResult({ error: (e as Error).message }, true);
       }
     },
   });
 
   const reportBlock = defineTool({
-    label: "report_blocker",
     name: "Worker reporting a blocking issue",
     description:
       "Use this when the result asked for cannot be provided. This may be because your tools are insufficient or the task given does not match reality",
@@ -265,23 +262,20 @@ export function renderTodoWorkerTools(subtaskId: string, schema?: string) {
       }),
     }),
 
-    execute: async (_toolCallId, params, _signal, _onUpdate, ctx) => {
+    execute: async (params, ctx) => {
       try {
         await crud.updateSubtask(subtaskId, {
           status: TaskStatus.blocked,
-          result: params.blockedReason
+          result: params.blockedReason,
         });
-        logger.error(params.blockedReason)
-        ctx.abort();
-        return toPiContent("ok");
+        logger.error(params.blockedReason);
+        ctx.stop();
+        return toToolResult("ok");
       } catch (e) {
-        return toPiContent({ error: (e as Error).message }, true);
+        return toToolResult({ error: (e as Error).message }, true);
       }
-    }
-  })
+    },
+  });
 
   return { workerResultTool, reportBlock };
 }
-
-
-

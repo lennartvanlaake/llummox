@@ -108,7 +108,11 @@ async function insertDocChunks(list: { source: string; content: string }[]) {
 }
 
 // ponytail: mirrors search.ts's searchRag so the test can use real embeddings.
-async function searchRag(query: string, maxResults: number) {
+async function searchRag(
+  query: string,
+  maxResults: number,
+  subject?: string,
+) {
   const embedded = await embed(query);
-  return dbSearch(embedded, maxResults);
+  return dbSearch(embedded, maxResults, subject);
 }

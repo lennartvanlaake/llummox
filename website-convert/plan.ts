@@ -1,7 +1,7 @@
 import { getTree } from "../shared/scout/functions";
 import type { MainStateTypeOut } from ".";
 import {
-  createPiWorkerAgent,
+  createWorkerAgent,
   type TaskConfig,
   workOnPlan,
 } from "../todos/agents";
@@ -9,6 +9,7 @@ import {
   renderScoutTools
 } from "../shared/scout/tools";
 import { initRagTool } from "../rag/tools";
+import { builtinTools } from "../shared/agent/builtin";
 import { setupDatabase as setupRagDb } from "../rag/db";
 import { setupDatabase as setupTodosDb } from "../todos/db";
 import { scoutSchema } from "./schemas";
@@ -52,8 +53,7 @@ export async function plan(state: MainStateTypeOut) {
     cwd: state.projectDir,
     worker:
     {
-      tools: Object.values(coderTools),
-      builtinTools: ["edit", "write", "read", "bash", "find"],
+      tools: [...Object.values(coderTools), ...builtinTools],
       cwd: state.projectDir,
       systemPromptAppend: `You are an expert web developer. Prefer using edit over write when possible. The directory tree looks like this: ${tree}.`,
     },

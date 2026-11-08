@@ -1,5 +1,5 @@
 import { eq, and, max } from "drizzle-orm";
-import { Type } from "@earendil-works/pi-ai";
+import { parseTsSchema } from "../shared/agent/schema";
 import {
   tasksTable,
   subtasksTable,
@@ -10,7 +10,6 @@ import {
 import { db } from "./db";
 import { randomUUIDv7 } from "bun";
 import { TaskStatus } from "./constants";
-import { logger } from "../shared/utils";
 
 //
 // ---- Tasks ----
@@ -138,11 +137,7 @@ export async function createSubtask(
 ) {
   try {
     if (values.schema) {
-      const schemaResult = Type.Script(values.schema)
-      if (!schemaResult.hasOwnProperty("Schema")) {
-        throw new Error("Schema must be defied as ```type Schema = ...```. Found " + values.schema)
-      }
-      logger.info(schemaResult)
+      parseTsSchema(values.schema);
     }
   } catch (e) {
     throw new Error(`TS schema provided in schema is incorrect. ${(e as any).message}`)

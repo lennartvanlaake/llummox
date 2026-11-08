@@ -9,32 +9,37 @@ import {
 import { logger } from "../shared/utils.ts";
 import { TaskStatus } from "./constants.ts";
 import type { SubtasksRow, TasksRow } from "./schema.ts";
+import { createReActAgent } from "../shared/agent/agent";
+import { LlamaClient } from "../shared/agent/llama";
 import type {
-  AgentSession,
-  ToolDefinition,
-  InlineExtension
-} from "@earendil-works/pi-coding-agent";
-import { createPiSession } from "../shared/pi.ts";
-import { compileSchema } from "json-schema-library";
-import { renderHurryUpExtension } from "../shared/extensions.ts";
+  Agent,
+  AnyTool,
+  ChatClient,
+  OnStep,
+} from "../shared/agent/types";
 
-type PiAgentOptions = {
+type AgentOptions = {
   cwd: string;
   systemPromptAppend?: string;
-  tools?: ToolDefinition[];
-  builtinTools?: string[];
-  extensions?: InlineExtension[];
+  tools?: AnyTool[];
+  client?: ChatClient;
+  maxSteps?: number;
+  temperature?: number;
+  maxTokens?: number;
+  onStep?: OnStep;
 };
+
 export type TaskConfig = {
   cwd: string;
   prompt: string;
-  worker: PiAgentOptions;
-  manager?: PiAgentOptions;
-  schema?: any;
-  type: "read" | "write"
+  worker: AgentOptions;
+  manager?: AgentOptions;
+  schema?: string;
+  type: "read" | "write";
 };
 
-const defaultPiOptions = { cwd: "/tmp" };
+const defaultClient = new LlamaClient();
+const defaultAgentOptions = { cwd: "/tmp" };
 
 const managerSystemPrompt = `You are an expect delegator. Create subtasks with conside descriptions. Be terse, no fluff, politeness or exclamations. Simplify and shorten language use. Use the createSubtask tool for delegation. Your chat responses are irrelevant, answer ".". EXTREMELY IMPORTANT: You are not allowed under any circumstance to complete the subtasks yourself.`;
 
@@ -42,83 +47,96 @@ export const workerSystemPrompt = `You are a worker. You focus on executing the 
 
 const summarizerSystemPrompt = `You are an expect summarizer. Use the updateData and getData tools to take the notes from the subtasks and convert them into a data object described by the requested schema. Your chat respones are irrelevant, answer ".". `;
 
+const workerHurryUp: OnStep = ({ step, messages }) => {
+  const turn = step + 1;
+  if (turn !== 10 && turn !== 14) return;
+  const system = messages.find((message) => message.role === "system");
+  if (!system || system.role !== "system") return;
+  system.content +=
+    turn === 10
+      ? " You are taking too long. Either report findings or raise a blocker soon. Turn 10/14."
+      : " Report findings or raise blocker NOW.";
+};
 
-const workerHurryUpExtension = renderHurryUpExtension({
-  warnLimit: 10,
-  warnMessage: "You are taking too long. Either report findings or raise a blocker soon. Nearing limit:",
-  cutoffLimit: 14,
-  cutoffMessage: "Report fidnings or raise blocker NOW"
-})
-
-export function createPiWorkerAgent(
-  options: PiAgentOptions = defaultPiOptions,
+export function createWorkerAgent(
+  options: AgentOptions = defaultAgentOptions,
   subtaskId: string,
-  subtaskSchema: any,
-) {
-  // add the data editing
+  subtaskSchema?: string,
+): Agent {
   const { workerResultTool } = renderTodoWorkerTools(
     subtaskId,
-    subtaskSchema
+    subtaskSchema,
   );
-  return createPiSession({
+  return createReActAgent({
+    client: options.client ?? defaultClient,
     cwd: options.cwd,
-    tools: [workerResultTool, ...(options?.tools ?? [])],
+    tools: [workerResultTool, ...(options.tools ?? [])],
     systemPrompt: `${workerSystemPrompt} ${options.systemPromptAppend ?? ""}`,
-    builtinTools: options.builtinTools ?? [],
-    extensionFactories: [workerHurryUpExtension]
+    maxSteps: options.maxSteps,
+    temperature: options.temperature,
+    maxTokens: options.maxTokens,
+    onStep: options.onStep ?? workerHurryUp,
   });
 }
 
 export function createManagerAgent(
-  options: PiAgentOptions = defaultPiOptions,
-  schema: any,
+  options: AgentOptions = defaultAgentOptions,
+  schema: string | undefined,
   taskId: string,
-) {
+): Agent {
   const { createSubtaskTool } = renderTodoManagerTools(taskId, schema);
-  return createPiSession({
+  return createReActAgent({
+    client: options.client ?? defaultClient,
     cwd: options.cwd,
-    tools: [createSubtaskTool, ...(options?.tools ?? [])],
+    tools: [createSubtaskTool, ...(options.tools ?? [])],
     systemPrompt: `${managerSystemPrompt}. ${options.systemPromptAppend ?? ""}`,
-    builtinTools: options.builtinTools ?? [],
+    maxSteps: options.maxSteps,
+    temperature: options.temperature,
+    maxTokens: options.maxTokens,
+    onStep: options.onStep,
   });
 }
 
 export function createSummarizerAgent(
-  options: PiAgentOptions = defaultPiOptions,
+  options: AgentOptions = defaultAgentOptions,
   taskId: string,
-  schema: any,
-) {
+  schema: string | undefined,
+): Agent {
   const { updateTaskData, getTaskData } = renderTodoManagerTools(
     taskId,
     schema,
   );
-  return createPiSession({
+  return createReActAgent({
+    client: options.client ?? defaultClient,
     cwd: options.cwd,
-    tools: [updateTaskData, getTaskData, ...(options?.tools ?? [])],
+    tools: [updateTaskData, getTaskData, ...(options.tools ?? [])],
     systemPrompt: `${summarizerSystemPrompt}.  The data object must comply with the following schema ${schema}. ${options.systemPromptAppend ?? ""}`,
-    builtinTools: options.builtinTools ?? [],
+    maxSteps: options.maxSteps,
+    temperature: options.temperature,
+    maxTokens: options.maxTokens,
+    onStep: options.onStep,
   });
 }
 
 export async function createTaskWithSubs(
   taskConfig: TaskConfig,
-  schema: any,
+  schema: string | undefined,
   previousTask?: TasksRow,
 ) {
   const task = await createTask({
     prompt: taskConfig.prompt,
   });
 
-  const agent = await createManagerAgent(taskConfig.manager, schema, task.id);
+  const agent = createManagerAgent(taskConfig.manager, schema, task.id);
 
-  let prompt = taskConfig.prompt
+  let prompt = taskConfig.prompt;
 
   if (previousTask) {
-    prompt += `The data from the previous task is """${JSON.stringify(previousTask!.data)}""". `
+    prompt += `The data from the previous task is """${JSON.stringify(previousTask.data)}""". `;
   }
 
   if (taskConfig.type == "read") {
-    prompt += `When combined, the result of all subtasks MUST be sufficient complete the schema: ${schema}. Add TypeScript schemas to your subtasks so your workers know how to format their results. Format: """type Schema = { prop: type }"""`
+    prompt += `When combined, the result of all subtasks MUST be sufficient complete the schema: ${schema}. Add TypeScript schemas to your subtasks so your workers know how to format their results. Format: """type Schema = { prop: type }"""`;
   }
 
   await agent.prompt(prompt);
@@ -127,7 +145,7 @@ export async function createTaskWithSubs(
   if (listSubtasks(task.id).length == 0) {
     await agent.prompt(
       prompt +
-      "EXTREMELY IMPORTANT: You need to call the createSubtask tool to create subtasks",
+        "EXTREMELY IMPORTANT: You need to call the createSubtask tool to create subtasks",
     );
   }
   return task;
@@ -136,7 +154,7 @@ export async function createTaskWithSubs(
 export async function doWork(
   task: TasksRow,
   subtask: SubtasksRow,
-  agent: AgentSession,
+  agent: Agent,
 ) {
   if (!subtask) {
     logger.info("No subtask found, returning");
@@ -155,9 +173,8 @@ export async function doWork(
   await agent.prompt(prompt);
 }
 
-
-async function summarize(task: TasksRow, schema: any) {
-  const agent = await createSummarizerAgent(defaultPiOptions, task.id, schema);
+async function summarize(task: TasksRow, schema: string | undefined) {
+  const agent = createSummarizerAgent(defaultAgentOptions, task.id, schema);
   const subtasks = listSubtasks(task.id);
   const subtasksTemplate = subtasks
     .map((it) => `Title: ${it.title}. Result: ${it.result}\n`)
@@ -191,23 +208,19 @@ export async function workOnTask(
   let subtask = getNextSubtask(task.id);
   while (subtask) {
     logger.info(subtask);
-    // try {
     await doWork(
       task,
       subtask,
-      await createPiWorkerAgent(
+      createWorkerAgent(
         taskConfig.worker,
         subtask.id,
-        subtask.schema,
+        subtask.schema ?? undefined,
       ),
     );
-    // } catch (e) {
-    //   logger.error(e);
-    // }
     subtask = getNextSubtask(task.id);
     loopCount++;
     if (loopCount > 50) {
-      return task
+      return task;
     }
   }
 

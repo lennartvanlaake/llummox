@@ -1,7 +1,7 @@
  Format mapping                                                                               
                                                                                               
  ┌────────────────────────────────────────┬─────────────────────────────────────┐             
- │ OLD construct                          │ NEW pi equivalent                   │             
+ │ OLD construct                          │ NEW agent equivalent                   │             
  ├────────────────────────────────────────┼─────────────────────────────────────┤             
  │ describe                               │ description (same)                  │             
  ├────────────────────────────────────────┼─────────────────────────────────────┤             
@@ -17,11 +17,11 @@
  ├────────────────────────────────────────┼─────────────────────────────────────┤             
  │ execute: async ({...}) => {...}        │ execute: async (_, params) => {...} │             
  ├────────────────────────────────────────┼─────────────────────────────────────┤             
- │ return string                          │ return toPiContent(string)          │             
+ │ return string                          │ return toToolResult(string)          │             
  ├────────────────────────────────────────┼─────────────────────────────────────┤             
- │ return string on error                 │ return toPiContent(string, true)    │             
+ │ return string on error                 │ return toToolResult(string, true)    │             
  ├────────────────────────────────────────┼─────────────────────────────────────┤             
- │ return object                          │ return toPiContent(object)          │             
+ │ return object                          │ return toToolResult(object)          │             
  ├────────────────────────────────────────┼─────────────────────────────────────┤             
  │ return AgentToolResult (already typed) │ stays as-is                         │             
  └────────────────────────────────────────┴─────────────────────────────────────┘             

@@ -2,7 +2,9 @@ import { test, expect, describe } from "bun:test";
 import { $ } from "bun";
 import { getTree } from "./functions";
 
-describe("getTree", () => {
+const hasLstr = Bun.which("lstr") !== null;
+
+describe.skipIf(!hasLstr)("getTree", () => {
   // lstr exits 0 with valid JSON for a normal/empty dir, and exits 1 with an
   // error on stderr + empty stdout for a missing path. We assert on that
   // behavior rather than the exact schema ("assume any").

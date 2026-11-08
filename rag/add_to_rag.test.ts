@@ -46,7 +46,7 @@ test("addFileToRag → searchRag: add a file, then find it back by meaning", asy
   const top = results[0]!;
   expect(top.source).toContain("tea");
   expect(top.content.toLowerCase()).toContain("tea");
-});
+}, 30_000);
 
 test("addDirectoryToRag indexes every file; search finds each topic", async () => {
   const dir = await mkdtemp(join(tmpdir(), "add-dir-"));
@@ -80,4 +80,4 @@ test("addDirectoryToRag indexes every file; search finds each topic", async () =
   expect(catResults.length).toBeGreaterThan(0);
   expect(rocketResults.length).toBeGreaterThan(0);
   expect(breadResults.length).toBeGreaterThan(0);
-});
+}, 30_000);

@@ -1,11 +1,5 @@
 import { test, expect, describe } from "bun:test";
-import {
-  wc,
-  grepRecursive,
-  simplifyHtml,
-  searchHtml,
-  readLines,
-} from "./tools";
+import { renderScoutTools } from "./tools";
 import { invokeTool } from "../testing";
 
 const FIX = `${import.meta.dir}/fixtures`;
@@ -14,6 +8,8 @@ const FIX = `${import.meta.dir}/fixtures`;
 // relative paths (testdir) as the source tree, matching real usage.
 const PROJECT_ROOT = `${import.meta.dir}/../..`;
 process.chdir(PROJECT_ROOT);
+const { wc, grepRecursive, simplifyHtml, searchHtml, readLines } =
+  renderScoutTools(PROJECT_ROOT);
 
 describe("Test scout tools", () => {
 
