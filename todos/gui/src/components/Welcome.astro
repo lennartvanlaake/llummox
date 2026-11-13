@@ -1,0 +1,14 @@
+---
+import { listTasks } from "../../../crud"
+import { setupDatabase } from "../../../db"
+import type { TasksRow } from "../../../schema";
+
+const dbPath = process.env.TODO_GUI_DB;
+setupDatabase(dbPath!)
+const tasks: TasksRow[] = listTasks()
+---
+<div id="container">
+	<ul>
+		{ tasks.map((it:TasksRow) => (<li>{it.prompt}</li>) ) } 
+	</ul>
+</div>

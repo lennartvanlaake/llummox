@@ -1,0 +1,25 @@
+
+import { test } from 'bun:test'
+import { randomUUIDv7 } from 'crypto';
+import { setupDatabase, db } from '../../db';
+import { subtasksTable, tasksTable } from '../../schema';
+import { runGui } from '../server';
+
+const delay = ms => new Promise(res => setTimeout(res, ms));
+test('run server', async () => {
+	setupDatabase("temp.db")
+	const taskId = randomUUIDv7();
+	const subTaskId = randomUUIDv7();
+
+	await db.insert(tasksTable)
+		.values({ id: taskId, prompt: "Task A" });
+	await db.insert(subtasksTable).values({
+		id: subTaskId,
+		title: "Sub A",
+		description: "d",
+		taskId,
+	});
+	await runGui("temp.db")
+	await delay(1000000000)
+}, 0)
+

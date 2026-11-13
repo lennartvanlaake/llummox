@@ -6,6 +6,7 @@ import {
   type SubtasksRow,
   type TasksInsert,
   type SubtasksInsert,
+  type TasksRow,
 } from "./schema";
 import { db } from "./db";
 import { randomUUIDv7 } from "bun";
@@ -41,8 +42,8 @@ export async function updateTask(id: string, input: Partial<TasksInsert>) {
   ).at(0)!;
 }
 
-export function listTasks() {
-  return db.select().from(tasksTable);
+export function listTasks(): TasksRow[] {
+  return db.select().from(tasksTable).all();
 }
 
 export async function deleteTask(id: string) {
