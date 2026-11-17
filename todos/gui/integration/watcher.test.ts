@@ -1,10 +1,10 @@
-import Database from "bun:sqlite";
 import { afterAll, expect, it } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { createTask } from "../../crud.ts";
 import { setupDatabase } from "../../db.ts";
-import { createDbWatcher } from "../events.ts";
+import { watchTaskEvents } from "../board/events.ts";
 
 const dir = mkdtempSync(join(tmpdir(), "todos-gui-"));
 const dbPath = join(dir, "todos.db");
@@ -13,33 +13,29 @@ afterAll(() => {
   rmSync(dir, { recursive: true, force: true });
 });
 
-it("detects a commit made by another connection", async () => {
+it("detects a task event made by another connection", async () => {
   setupDatabase(dbPath);
 
-  let version = 0;
-  const watcher = createDbWatcher(
+  const events: { taskId: string; type: string }[] = [];
+  const stopWatching = watchTaskEvents(
     dbPath,
-    (next) => {
-      version = next;
+    (batch) => {
+      events.push(...batch);
     },
     20,
   );
 
-  const writer = new Database(dbPath);
   try {
-    writer.run(
-      "INSERT INTO tasks (id, status, prompt) VALUES (?, ?, ?)",
-      ["0001", "todo", "Detected task"],
-    );
+    const task = await createTask({ prompt: "Detected task" });
 
     const deadline = Date.now() + 2000;
-    while (version === 0 && Date.now() < deadline) {
+    while (events.length === 0 && Date.now() < deadline) {
       await new Promise((resolve) => setTimeout(resolve, 20));
     }
 
-    expect(version).toBeGreaterThan(0);
+    expect(events[0]?.taskId).toBe(task.id);
+    expect(events[0]?.type).toBe("task.created");
   } finally {
-    writer.close();
-    watcher.close();
+    stopWatching();
   }
 });

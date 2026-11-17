@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import { sqliteTable, integer, text } from "drizzle-orm/sqlite-core";
+import type { TaskEventType } from "./constants";
 
 export const CURRENT_TIMESTAMP = sql`CURRENT_TIMESTAMP`;
 
@@ -36,3 +37,11 @@ export const subtasksTable = sqliteTable("subtasks", {
 });
 export type SubtasksRow = typeof subtasksTable.$inferSelect;
 export type SubtasksInsert = typeof subtasksTable.$inferInsert;
+
+export const taskEventsTable = sqliteTable("task_events", {
+  id: integer().primaryKey({ autoIncrement: true }),
+  taskId: text().notNull(),
+  type: text().$type<TaskEventType>().notNull(),
+  createdAt: integer().notNull().default(CURRENT_TIMESTAMP),
+});
+export type TaskEventRow = typeof taskEventsTable.$inferSelect;

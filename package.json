@@ -5,11 +5,13 @@
   "private": true,
   "scripts": {
     "todos:migrations": "cd todos && bunx drizzle-kit generate --dialect sqlite --schema schema.ts",
-    "todos:gui": "bun run todos/gui/server.ts",
+    "todos:gui": "bun run todos/gui/server.tsx",
     "todos:gui:fixtures": "bun run todos/gui/fixtures/run.ts"
   },
   "devDependencies": {
     "@types/bun": "latest",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
     "drizzle-kit": "^0.31.11",
     "tsrs": "^0.25.0-ts7.1.0-beta"
   },
@@ -25,8 +27,9 @@
     "hono": "^4.13.19",
     "install": "^0.13.0",
     "json-schema-library": "^11.6.16",
-    "jsx-async-runtime": "^3.0.1",
     "pino": "^10.4.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
     "sqlite-vec": "^0.1.9",
     "typebox": "1.3.27"
   }

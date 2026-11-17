@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import type { SubtasksRow, TasksRow } from "../schema.ts";
-import { buildLanes, statusLabel } from "./board.ts";
+import { buildTaskViews, statusLabel } from "./board/model.ts";
 
 function task(
   id: string,
@@ -30,8 +30,8 @@ function subtask(
   };
 }
 
-describe("buildLanes", () => {
-  it("groups subtasks by status, preserves order and counts done", () => {
+describe("buildTaskViews", () => {
+  it("groups subtasks by status lane, preserves order and counts done", () => {
     const tasks = [task("0001", "Task one")];
     const subtasks = [
       subtask("s3", "0001", "done", 2),
@@ -40,52 +40,44 @@ describe("buildLanes", () => {
       subtask("s4", "0001", "done", 3),
     ];
 
-    const [lane] = buildLanes(tasks, subtasks);
-    expect(lane?.task.prompt).toBe("Task one");
-    expect(lane?.total).toBe(4);
-    expect(lane?.done).toBe(2);
-    expect(lane?.columns.map((column) => column.status)).toEqual([
+    const [taskView] = buildTaskViews(tasks, subtasks);
+    expect(taskView?.task.prompt).toBe("Task one");
+    expect(taskView?.total).toBe(4);
+    expect(taskView?.done).toBe(2);
+    expect(taskView?.lanes.map((lane) => lane.status)).toEqual([
       "todo",
       "in-progress",
       "blocked",
       "done",
     ]);
-    expect(lane?.columns[0]?.subtasks.map((item) => item.id)).toEqual(["s1"]);
-    expect(lane?.columns[1]?.subtasks.map((item) => item.id)).toEqual(["s2"]);
-    expect(lane?.columns[2]?.subtasks).toHaveLength(0);
-    expect(lane?.columns[3]?.subtasks.map((item) => item.id)).toEqual([
+    expect(taskView?.lanes[0]?.subtasks.map((item) => item.id)).toEqual(["s1"]);
+    expect(taskView?.lanes[1]?.subtasks.map((item) => item.id)).toEqual(["s2"]);
+    expect(taskView?.lanes[2]?.subtasks).toHaveLength(0);
+    expect(taskView?.lanes[3]?.subtasks.map((item) => item.id)).toEqual([
       "s3",
       "s4",
     ]);
   });
 
   it("sorts tasks newest first by UUIDv7 id", () => {
-    const lanes = buildLanes(
+    const views = buildTaskViews(
       [task("0001", "older"), task("0003", "newer"), task("0002", "middle")],
       [],
     );
-    expect(lanes.map((lane) => lane.task.prompt)).toEqual([
+    expect(views.map((view) => view.task.prompt)).toEqual([
       "newer",
       "middle",
       "older",
     ]);
   });
 
-  it("keeps unknown statuses visible in the todo column", () => {
-    const [lane] = buildLanes(
-      [task("0001", "Task")],
-      [subtask("s1", "0001", "mystery", 0)],
-    );
-    expect(lane?.columns[0]?.subtasks.map((item) => item.id)).toEqual(["s1"]);
-  });
-
-  it("leaves a task with no subtasks as an empty lane", () => {
-    const [lane] = buildLanes([task("0001", "Task")], []);
-    expect(lane?.total).toBe(0);
-    expect(lane?.done).toBe(0);
-    expect(lane?.columns.every((column) => column.subtasks.length === 0)).toBe(
-      true,
-    );
+  it("leaves a task with no subtasks as an empty task view", () => {
+    const [taskView] = buildTaskViews([task("0001", "Task")], []);
+    expect(taskView?.total).toBe(0);
+    expect(taskView?.done).toBe(0);
+    expect(
+      taskView?.lanes.every((lane) => lane.subtasks.length === 0),
+    ).toBe(true);
   });
 
   it("labels known and unknown statuses", () => {

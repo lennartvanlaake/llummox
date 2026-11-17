@@ -6,6 +6,8 @@
     "target": "ESNext",
     "module": "Preserve",
     "moduleDetection": "force",
+    "jsx": "react-jsx",
+    "jsxImportSource": "react",
     "allowJs": true,
     "types": [
       "bun"

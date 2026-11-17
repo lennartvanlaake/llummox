@@ -1,19 +1,19 @@
 import { describe, expect, it } from "bun:test";
 import { createSubtask, createTask, updateSubtask } from "../crud.ts";
 import { setupDatabase } from "../db.ts";
-import { createApp } from "./app.ts";
-import { createEventHub } from "./events.ts";
+import { createApp } from "./app.tsx";
+import { createClients } from "./utilities/events.ts";
 
 async function setup() {
   setupDatabase(":memory:");
   const task = await createTask({ prompt: "Build <board>" });
   const subtask = await createSubtask({
     taskId: task.id,
-    title: "Render <lane>",
+    title: "Render <subtask>",
     description: "Show the subtask details",
   });
   await updateSubtask(subtask.id, { status: "in-progress" });
-  return createApp(createEventHub());
+  return createApp(createClients());
 }
 
 describe("todos GUI routes", () => {
@@ -26,7 +26,7 @@ describe("todos GUI routes", () => {
     expect(response.headers.get("content-type")).toContain("text/html");
     expect(body).toContain("<!DOCTYPE html>");
     expect(body).toContain("Build &lt;board&gt;");
-    expect(body).toContain("Render &lt;lane&gt;");
+    expect(body).toContain("Render &lt;subtask&gt;");
     expect(body).toContain('sse-connect="/events"');
   });
 
@@ -47,7 +47,7 @@ describe("todos GUI routes", () => {
     expect(css.status).toBe(200);
     expect(css.headers.get("content-type")).toContain("text/css");
 
-    const missing = await app.request("/static/../todos/gui/server.ts");
+    const missing = await app.request("/static/../todos/gui/server.tsx");
     expect(missing.status).toBe(404);
   });
 

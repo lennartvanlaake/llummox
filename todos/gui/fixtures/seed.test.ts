@@ -1,10 +1,10 @@
 import { describe, expect, it } from "bun:test";
 import { getSubtasksAll, listTasks } from "../../crud.ts";
 import { setupDatabase } from "../../db.ts";
-import { seedFixtures } from "./run.ts";
+import { seedFixtures } from "./seeds.ts";
 
 describe("fixture seed", () => {
-  it("creates varied lanes and subtasks", async () => {
+  it("creates varied tasks and subtasks", async () => {
     setupDatabase(":memory:");
 
     const counts = await seedFixtures();

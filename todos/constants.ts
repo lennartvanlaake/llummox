@@ -9,3 +9,14 @@ export const TaskStatus = Object.fromEntries(
 ) as {
     [K in TaskStatusType]: K;
   };
+
+export const TASK_EVENT_TYPES = [
+  "task.created",
+  "task.updated",
+  "task.deleted",
+  "subtask.created",
+  "subtask.updated",
+  "subtask.deleted",
+] as const;
+
+export type TaskEventType = (typeof TASK_EVENT_TYPES)[number];

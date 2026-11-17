@@ -3,6 +3,7 @@ import { parseTsSchema } from "../shared/agent/schema";
 import {
   tasksTable,
   subtasksTable,
+  taskEventsTable,
   type SubtasksRow,
   type TasksInsert,
   type SubtasksInsert,
@@ -10,7 +11,11 @@ import {
 } from "./schema";
 import { db } from "./db";
 import { randomUUIDv7 } from "bun";
-import { TaskStatus } from "./constants";
+import { TaskStatus, type TaskEventType } from "./constants";
+
+async function recordTaskEvent(taskId: string, type: TaskEventType) {
+  await db.insert(taskEventsTable).values({ taskId, type });
+}
 
 //
 // ---- Tasks ----
@@ -24,7 +29,9 @@ export async function createTask(values: Omit<TasksInsert, "id" | "status">) {
     .insert(tasksTable)
     .values({ id: randomUUIDv7(), status: TaskStatus["todo"], ...values })
     .returning();
-  return insert.at(0)!;
+  const task = insert.at(0)!;
+  await recordTaskEvent(task.id, "task.created");
+  return task;
 }
 
 export async function updateTask(id: string, input: Partial<TasksInsert>) {
@@ -33,13 +40,15 @@ export async function updateTask(id: string, input: Partial<TasksInsert>) {
     throw new Error(`Task with id ${id} does not exist`);
   }
   const merged = { ...task, ...input };
-  return (
+  const updated = (
     await db
       .update(tasksTable)
       .set(merged)
       .where(eq(tasksTable.id, id))
       .returning()
   ).at(0)!;
+  await recordTaskEvent(updated.id, "task.updated");
+  return updated;
 }
 
 export function listTasks(): TasksRow[] {
@@ -58,6 +67,9 @@ export async function deleteTask(id: string) {
     .delete(tasksTable)
     .where(eq(tasksTable.id, id))
     .returning();
+  if (row.length > 0) {
+    await recordTaskEvent(id, "task.deleted");
+  }
   return row.length > 0;
 }
 //
@@ -158,7 +170,9 @@ export async function createSubtask(
       ...values,
     })
     .returning();
-  return insert.at(0)!;
+  const subtask = insert.at(0)!;
+  await recordTaskEvent(subtask.taskId, "subtask.created");
+  return subtask;
 }
 
 export async function updateSubtask(
@@ -180,6 +194,7 @@ export async function updateSubtask(
       status: await recomputeTaskStatus(parent.id),
     });
   }
+  await recordTaskEvent(subtask.taskId!, "subtask.updated");
   return updated.at(0)!;
 }
 
@@ -188,5 +203,8 @@ export async function deleteSubtask(id: string) {
     .delete(subtasksTable)
     .where(eq(subtasksTable.id, id))
     .returning()) as SubtasksRow[];
+  if (row.length > 0) {
+    await recordTaskEvent(row[0]!.taskId, "subtask.deleted");
+  }
   return row.length > 0;
 }

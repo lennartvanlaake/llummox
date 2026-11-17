@@ -1,62 +1,62 @@
 import { describe, expect, it } from "bun:test";
-import { createChangeDetector, createEventHub } from "./events.ts";
+import type { BoardClient } from "./utilities/events.ts";
+import { createClients } from "./utilities/events.ts";
 
-describe("event hub", () => {
-  it("broadcasts to current subscribers only", async () => {
-    const hub = createEventHub();
-    const seen: string[] = [];
-    const off = hub.add(async (html) => {
-      seen.push(html);
-    });
+function fakeClient() {
+  let abortHandler: (() => void) | undefined;
+  const messages: { event: string; data: string; id?: string }[] = [];
+  const client: BoardClient = {
+    async writeSSE(message) {
+      messages.push(message);
+    },
+    onAbort(listener) {
+      abortHandler = listener;
+    },
+  };
+  return {
+    client,
+    messages,
+    abort: () => abortHandler?.(),
+  };
+}
 
-    expect(hub.size).toBe(1);
-    await hub.broadcast("<p>one</p>");
-    expect(seen).toEqual(["<p>one</p>"]);
+describe("clients", () => {
+  it("pushes to connected clients and removes aborted ones", async () => {
+    const clients = createClients();
+    const first = fakeClient();
+    const second = fakeClient();
+    clients.add(first.client);
+    clients.add(second.client);
+    expect(clients.size).toBe(2);
 
-    off();
-    expect(hub.size).toBe(0);
-    await hub.broadcast("<p>two</p>");
-    expect(seen).toEqual(["<p>one</p>"]);
+    await clients.push("board", "<p>one</p>");
+    expect(first.messages).toEqual([{ event: "board", data: "<p>one</p>" }]);
+    expect(second.messages).toEqual([{ event: "board", data: "<p>one</p>" }]);
+
+    second.abort();
+    expect(clients.size).toBe(1);
+    await clients.push("task", "<p>two</p>", 2);
+    expect(first.messages).toEqual([
+      { event: "board", data: "<p>one</p>" },
+      { event: "task", data: "<p>two</p>", id: "2" },
+    ]);
+    expect(second.messages).toEqual([{ event: "board", data: "<p>one</p>" }]);
   });
 
-  it("drops subscribers whose send fails", async () => {
-    const hub = createEventHub();
+  it("drops a client whose write fails", async () => {
+    const clients = createClients();
     let calls = 0;
-    hub.add(async () => {
-      calls++;
-      throw new Error("disconnected");
+    clients.add({
+      async writeSSE() {
+        calls++;
+        throw new Error("closed");
+      },
+      onAbort() {},
     });
 
-    await hub.broadcast("<p>one</p>");
-    expect(hub.size).toBe(0);
-    await hub.broadcast("<p>two</p>");
+    await clients.push("task", "<p>one</p>");
+    expect(clients.size).toBe(0);
+    await clients.push("task", "<p>two</p>");
     expect(calls).toBe(1);
-  });
-
-  it("does nothing when there are no subscribers", async () => {
-    const hub = createEventHub();
-    await expect(hub.broadcast("<p>nobody</p>")).resolves.toBeUndefined();
-  });
-});
-
-describe("change detector", () => {
-  it("only fires when the version changes", () => {
-    let version = 1;
-    const seen: number[] = [];
-    const detector = createChangeDetector(
-      () => version,
-      (next) => seen.push(next),
-    );
-
-    detector.check();
-    expect(seen).toEqual([]);
-
-    version = 2;
-    detector.check();
-    expect(seen).toEqual([2]);
-    expect(detector.version).toBe(2);
-
-    detector.check();
-    expect(seen).toEqual([2]);
   });
 });

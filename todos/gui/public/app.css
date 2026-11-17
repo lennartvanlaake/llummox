@@ -24,12 +24,12 @@
   padding: var(--space-4) var(--space-5) var(--space-8);
 }
 
-.lane {
+.task {
   padding: 0;
   overflow: hidden;
 }
 
-.lane-head {
+.task-head {
   display: flex;
   align-items: center;
   gap: var(--space-3);
@@ -37,7 +37,7 @@
   border-bottom: 1px solid var(--border);
 }
 
-.lane-title {
+.task-title {
   flex: 1;
   margin: 0;
   font-size: var(--text-4);
@@ -45,7 +45,7 @@
   overflow-wrap: anywhere;
 }
 
-.lane-count {
+.task-count {
   color: var(--muted-foreground);
   font-size: var(--text-7);
   font-variant-numeric: tabular-nums;
@@ -67,7 +67,7 @@
   padding: 0 var(--space-4) var(--space-4);
 }
 
-.lane-grid {
+.task-lanes {
   display: grid;
   grid-template-columns: var(--lane-columns);
   gap: var(--space-3);
@@ -75,11 +75,11 @@
   overflow-x: auto;
 }
 
-.column {
+.lane {
   min-width: 0;
 }
 
-.column-title {
+.lane-title {
   display: flex;
   justify-content: space-between;
   gap: var(--space-2);
@@ -172,7 +172,7 @@ pre {
 }
 
 @media (max-width: 900px) {
-  .lane-grid {
+  .task-lanes {
     grid-template-columns: repeat(4, minmax(16rem, 1fr));
   }
 }
