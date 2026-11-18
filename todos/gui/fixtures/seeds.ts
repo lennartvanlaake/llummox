@@ -70,12 +70,12 @@ const seeds: TaskSeed[] = [
   {
     prompt: "Migrate the fixture database",
     notes:
-      "Fresh DB on every fixture run; migrations come from todos/drizzle.",
+      "Fresh DB on every fixture run; migrations come from todos/migrations.",
     data: { migrated: true, tables: ["tasks", "subtasks"] },
     status: "done",
     subtasks: [
       {
-        title: "Run drizzle migrations",
+        title: "Run SQL migrations",
         description: "Apply the checked-in migrations to the fresh DB.",
         status: "done",
         result: json({ ok: true }),
@@ -119,7 +119,7 @@ const seeds: TaskSeed[] = [
   {
     prompt: "Document the task schema",
     notes: "No subtasks yet; this task demonstrates the empty state.",
-    data: { doc: "todos/schema.ts" },
+    data: { doc: "todos/types.ts" },
     status: "todo",
     subtasks: [],
   },

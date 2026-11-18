@@ -1,8 +1,6 @@
 import { beforeAll, describe, expect, test } from "bun:test";
-import { eq } from "drizzle-orm";
-import { setupDatabase, db } from "./db";
-import { subtasksTable } from "./schema";
-import { createTask, getTask } from "./crud";
+import { setupDatabase } from "./db";
+import { createTask, getSubtask, getTask, listSubtasks } from "./crud";
 import { invokeTool } from "../shared/testing";
 import {
   renderTodoManagerTools,
@@ -102,14 +100,7 @@ describe("todo worker tools", () => {
     });
     expect(made.text).toContain("Success");
 
-    const rows = await db
-      .select({
-        id: subtasksTable.id,
-        status: subtasksTable.status,
-      })
-      .from(subtasksTable)
-      .where(eq(subtasksTable.taskId, task.id))
-      .orderBy(subtasksTable.order);
+    const rows = listSubtasks(task.id);
     const subtaskId = rows.at(-1)!.id;
     expect(rows.at(-1)!.status).toBe("todo");
 
@@ -120,11 +111,7 @@ describe("todo worker tools", () => {
     expect(res.result.isError).toBe(false);
     expect(res.text).toBe("ok");
 
-    const fetched = await db
-      .select()
-      .from(subtasksTable)
-      .where(eq(subtasksTable.id, subtaskId));
-    expect(fetched[0]!.status).toBe("done");
+    expect(getSubtask(subtaskId)!.status).toBe("done");
   });
 
   test("worker result errors on a missing subtask", async () => {

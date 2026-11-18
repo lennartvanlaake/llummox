@@ -5,7 +5,7 @@ import {
   listSubtasks,
   listTasks,
 } from "../../crud.ts";
-import type { SubtasksRow, TasksRow } from "../../schema.ts";
+import type { SubtasksRow, TasksRow } from "../../types.ts";
 
 export type Lane = {
   status: TaskStatusType;

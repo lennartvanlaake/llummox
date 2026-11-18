@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
-import type { SubtasksRow, TasksRow } from "../schema.ts";
+import type { SubtasksRow, TasksRow } from "../types.ts";
 import { Board } from "./board/board.tsx";
 import { Layout } from "./board/layout.tsx";
 import { buildTaskViews } from "./board/model.ts";

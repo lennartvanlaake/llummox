@@ -8,7 +8,7 @@ import {
 } from "./crud.ts";
 import { logger } from "../shared/utils.ts";
 import { TaskStatus } from "./constants.ts";
-import type { SubtasksRow, TasksRow } from "./schema.ts";
+import type { SubtasksRow, TasksRow } from "./types.ts";
 import { createReActAgent } from "../shared/agent/agent";
 import { LlamaClient } from "../shared/agent/llama";
 import type {

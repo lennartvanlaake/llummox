@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import type { SubtasksRow, TasksRow } from "../schema.ts";
+import type { SubtasksRow, TasksRow } from "../types.ts";
 import { buildTaskViews, statusLabel } from "./board/model.ts";
 
 function task(

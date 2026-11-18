@@ -1,34 +1,28 @@
-import { describe, it, expect } from "bun:test";
-import { setupDatabase, db } from "./db";
-import { tasksTable, subtasksTable } from "./schema";
-import { randomUUIDv7 } from "bun";
+import { beforeEach, describe, expect, it } from "bun:test";
+import { createSubtask, createTask, listSubtasks, listTasks } from "./crud";
+import { all, setupDatabase } from "./db";
+import type { TaskEventRow } from "./types";
 
 describe("setupDatabase", () => {
-  it("migrates and round-trips epic -> task -> subtask -> blocker", async () => {
+  beforeEach(() => {
     setupDatabase(":memory:");
+  });
 
-    const taskId = randomUUIDv7();
-    const subTaskId = randomUUIDv7();
-
-    await db
-      .insert(tasksTable)
-      .values({ id: taskId, prompt: "Task A" });
-    await db.insert(subtasksTable).values({
-      id: subTaskId,
+  it("migrates and round-trips task -> subtask", () => {
+    const task = createTask({ prompt: "Task A" });
+    const subtask = createSubtask({
+      taskId: task.id,
       title: "Sub A",
       description: "d",
-      taskId,
     });
 
-    expect((await db.select().from(tasksTable)).length).toBe(1);
-    expect((await db.select().from(subtasksTable)).length).toBe(1);
-    //
-    // // delete children first (FK enforcement: tasks reference epics),
-    // // then parents. crud.ts handles cascade automatically.
-    // db.delete(subtasksTable).values({ id: subTaskId });
-    // db.delete(tasksTable).values({ id: taskId });
-    //
-    // expect((await db.select().from(tasksTable)).length).toBe(0);
-    // expect((await db.select().from(subtasksTable)).length).toBe(0);
+    expect(listTasks().map((row) => row.id)).toEqual([task.id]);
+    expect(listSubtasks(task.id).map((row) => row.id)).toEqual([subtask.id]);
+
+    const events = all<TaskEventRow>("task-events/list.sql");
+    expect(events.map((event) => event.type)).toEqual([
+      "task.created",
+      "subtask.created",
+    ]);
   });
 });

@@ -5,12 +5,12 @@ import {
   deleteTask,
   updateTask,
 } from "../../crud.ts";
-import { db, setupDatabase } from "../../db.ts";
-import { taskEventsTable } from "../../schema.ts";
+import { all, setupDatabase } from "../../db.ts";
+import type { TaskEventRow } from "../../types.ts";
 import { renderTaskEvents } from "./live.tsx";
 
 function events() {
-  return db.select().from(taskEventsTable).all();
+  return all<TaskEventRow>("task-events/list.sql");
 }
 
 describe("task event rendering", () => {

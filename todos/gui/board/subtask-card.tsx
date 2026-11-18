@@ -1,4 +1,4 @@
-import type { SubtasksRow } from "../../schema.ts";
+import type { SubtasksRow } from "../../types.ts";
 import { StatusBadge } from "./status-badge.tsx";
 
 export function SubtaskCard({ subtask }: { subtask: SubtasksRow }) {

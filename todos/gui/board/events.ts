@@ -1,4 +1,5 @@
 import Database from "bun:sqlite";
+import { readQuery } from "../../db.ts";
 import type { TaskEventType } from "../../constants.ts";
 
 export type TaskEvent = {
@@ -13,18 +14,18 @@ export function watchTaskEvents(
   intervalMs = 500,
 ) {
   const db = new Database(dbPath);
+  // This connection polls only, but keep FK behavior consistent with the app.
+  db.run("PRAGMA foreign_keys = ON");
   const latest = db
-    .query("SELECT COALESCE(MAX(id), 0) AS id FROM task_events")
+    .query(readQuery("task-events/latest.sql"))
     .get() as { id: number };
   let lastId = latest.id;
 
   const timer = setInterval(() => {
     try {
       const events = db
-        .query(
-          "SELECT id, taskId, type FROM task_events WHERE id > ? ORDER BY id",
-        )
-        .all(lastId) as TaskEvent[];
+        .query(readQuery("task-events/since.sql"))
+        .all({ id: lastId }) as TaskEvent[];
       if (events.length === 0) return;
       lastId = events[events.length - 1]!.id;
       onChange(events);

@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it } from "bun:test";
 import * as crud from "./crud.ts";
-import { db, setupDatabase } from "./db.ts";
-import { taskEventsTable } from "./schema.ts";
+import { all, run, setupDatabase } from "./db.ts";
+import type { TaskEventRow } from "./types.ts";
 
 function events() {
-  return db.select().from(taskEventsTable).all();
+  return all<TaskEventRow>("task-events/list.sql");
 }
 
 describe("task events", () => {
@@ -51,5 +51,20 @@ describe("task events", () => {
     const task = await crud.createTask({ prompt: "T" });
     await crud.updateTask(task.id, { status: "in-progress" });
     expect(events().at(-1)?.type).toBe("task.updated");
+  });
+
+  it("records events from direct SQL writes, not just crud", () => {
+    run("tasks/create.sql", {
+      id: "direct-task",
+      status: "todo",
+      prompt: "T",
+      data: "{}",
+      notes: null,
+    });
+
+    expect(events().at(-1)).toMatchObject({
+      taskId: "direct-task",
+      type: "task.created",
+    });
   });
 });

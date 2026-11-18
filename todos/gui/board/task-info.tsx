@@ -1,4 +1,4 @@
-import type { TasksRow } from "../../schema.ts";
+import type { TasksRow } from "../../types.ts";
 import { statusLabel } from "./model.ts";
 
 export function TaskInfo({ task }: { task: TasksRow }) {
