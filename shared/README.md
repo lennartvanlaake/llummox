@@ -11,7 +11,10 @@ Small pi-free agent runtime for a local llama.cpp server using its OpenAI-compat
 | `agent/react.ts` | native `tool_calls` ReAct loop |
 | `agent/agent.ts` | stateful session facade with injectable loop |
 | `agent/structured.ts` | one-shot JSON-schema output |
-| `agent/builtin.ts` | minimal `read`, `write`, `edit`, `find`, `bash` tools |
+| `agent/builtin.ts` | minimal `read`, `apply`, `search`, `bash` tools |
+| `agent/editing/` | ast-grep definition lookup and create/replace/apply engine |
+| `agent/search.ts` | ripgrep-backed file/content search and AST symbol outline |
+| `agent/html.ts` | filtered HTML views with optional CSS selector extraction |
 | `agent/schema.ts` | `parseTsSchema()` for `type Schema = { ... }` strings |
 | `agent/logging.ts` | pino logging in the existing `role: text` / `Tool call ...` shape |
 
@@ -113,12 +116,58 @@ import { builtinTools, createReActAgent } from "./agent";
 const agent = createReActAgent({
   client,
   systemPrompt: "You can inspect and edit files.",
-  tools: builtinTools, // read, write, edit, find, bash
+  tools: builtinTools, // read, apply, search, bash
   cwd: "/some/project",
 });
 ```
 
 Paths are resolved inside `cwd`; `bash` runs through the existing sandbox.
+
+`apply` replaces the old `write`/`edit` tools:
+
+```ts
+apply({ operation: "create", path: "src/new.ts", content: "..." })
+apply({ operation: "overwrite", path: "src/new.ts", content: "..." })
+apply({ operation: "replace", path: "README.md", oldText: "...", newText: "..." })
+apply({
+  operation: "replace_definition",
+  path: "src/greet.ts",
+  symbol: "Greeter.greet",
+  kind: "method", // optional disambiguator
+  replacement: "greet(name: string) { return name; }",
+});
+```
+
+`replace_definition` supports `.ts`, `.tsx`, `.js`, and `.jsx`. It replaces the declaration only; `export`/`declare` wrappers, decorators, and attached comments are preserved. The edit is rejected if it introduces new syntax errors.
+
+`read` has a symbol mode and a filtered HTML mode:
+
+```ts
+read({ path: "src/greet.ts", mode: "symbol", symbol: "Greeter.greet" })
+read({ path: "page.html", mode: "filtered_html" })
+read({ path: "page.html", mode: "filtered_html", selector: "main, article" })
+```
+
+`filtered_html` is not raw source. It streams the file through Bun's `HTMLRewriter` and returns a filtered HTML view with:
+
+- `svg`, `script`, `style`, `noscript`, and `template` content removed
+- comments and hidden nodes removed
+- only `id`, `class`, `href`, `alt`, and `aria-label` attributes kept
+- block-level formatting with indentation
+- an optional CSS `selector` to return only matching elements
+- a `maxChars` cap, default and maximum `10000`
+
+`search` is the directory-level discovery tool:
+
+```ts
+search({ mode: "files", query: "greet" })        // fuzzy paths
+search({ mode: "files", query: "*.tsx" })        // path glob
+search({ mode: "content", query: "helloWorld" }) // grep-style text search
+search({ mode: "symbols", path: "src", query: "Greeter", kind: "method" })
+search({ mode: "symbols", path: "src" })         // full AST outline
+```
+
+It uses a local ripgrep binary from `@vscode/ripgrep`, respects `.gitignore` for file enumeration, and skips `node_modules` and `.git` by default.
 
 ## Tests
 

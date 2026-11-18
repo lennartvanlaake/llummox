@@ -18,10 +18,12 @@
     "typescript": "^5.9.3"
   },
   "dependencies": {
+    "@ast-grep/napi": "0.51.3",
     "@chonkiejs/core": "^0.0.12",
     "@gabrielbryk/jq-ts": "^1.7.0",
     "@huggingface/transformers": "^4.3.2",
     "@sinclair/typebox": "^0.34.52",
+    "@vscode/ripgrep": "1.18.0",
     "hono": "^4.13.19",
     "install": "^0.13.0",
     "json-schema-library": "^11.6.16",

@@ -1,23 +1,50 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { dirname, isAbsolute, relative, resolve } from "node:path";
+import { readFile } from "node:fs/promises";
 import { sandboxCommand } from "../../sandbox/sandbox";
-import { defineTool, Type } from "./tools";
+import { splitLines } from "./editing/apply";
+import {
+  formatMatchFailure,
+  matchDefinition,
+  requireParsedScript,
+} from "./editing/definitions";
+import { resolveInside } from "./editing/paths";
+import { applyTool } from "./editing/tool";
+import { readFilteredHtmlFile } from "./html";
+import { searchTool } from "./search";
+import { defineTool, stringEnum, Type } from "./tools";
 import type { AnyTool } from "./types";
 
-function resolveInside(cwd: string, file: string): string {
-  const path = resolve(cwd, file);
-  const rel = relative(cwd, path);
-  if (rel.startsWith("..") || isAbsolute(rel)) {
-    throw new Error(`Path escapes cwd: ${file}`);
-  }
-  return path;
-}
+export { applyTool, searchTool };
 
 export const readTool = defineTool({
   name: "read",
-  description: "Read a file and return numbered lines.",
+  description:
+    'Read a file as numbered lines, one AST definition, or a filtered HTML view (not raw source). Use mode="filtered_html" for large HTML files.',
   parameters: Type.Object({
     path: Type.String({ description: "File path relative to cwd." }),
+    mode: Type.Optional(
+      stringEnum(["file", "symbol", "filtered_html"], {
+        description:
+          'file: numbered lines. symbol: one AST definition. filtered_html: filtered HTML output, not raw source. Default file.',
+      }),
+    ),
+    symbol: Type.Optional(
+      Type.String({
+        description:
+          'Definition to read in mode=symbol, for example "Greeter.greet".',
+      }),
+    ),
+    selector: Type.Optional(
+      Type.String({
+        description:
+          'Optional CSS selector for mode=filtered_html, for example "main, article" or "#content .card".',
+      }),
+    ),
+    maxChars: Type.Optional(
+      Type.Integer({
+        description:
+          "Maximum characters for mode=filtered_html. Default and maximum 10000.",
+      }),
+    ),
     offset: Type.Optional(
       Type.Integer({ description: "1-based first line. Default 1." }),
     ),
@@ -27,72 +54,55 @@ export const readTool = defineTool({
   }),
   execute: async (params, ctx) => {
     const file = resolveInside(ctx.cwd, params.path);
+    const mode = params.mode ?? "file";
+
+    if (mode === "filtered_html") {
+      return readFilteredHtmlFile(file, params.path, {
+        selector: params.selector,
+        maxChars: params.maxChars,
+      });
+    }
+
     const text = await readFile(file, "utf8");
+
+    if (mode === "symbol") {
+      const symbol = params.symbol?.trim();
+      if (!symbol) {
+        throw new Error('read mode="symbol" requires a non-empty "symbol".');
+      }
+      const parsed = requireParsedScript(params.path, text);
+      const match = matchDefinition(parsed.definitions, symbol);
+      if (match.status !== "ok") {
+        throw new Error(formatMatchFailure(match, params.path));
+      }
+      const lines = splitLines(text);
+      const start = Math.max(1, match.definition.startLine);
+      const end = Math.min(lines.length, match.definition.endLine);
+      const body = formatNumberedLines(lines, start, end);
+      return `${params.path}:${start}-${end} ${match.definition.kind} ${match.definition.qualifiedName}\n${body}`;
+    }
+
+    if (mode !== "file") {
+      throw new Error(`Unknown read mode: ${String(mode)}`);
+    }
+
+    if (text.length === 0) {
+      return "File is empty.";
+    }
+
+    const lines = splitLines(text);
     const offset = Math.max(0, (params.offset ?? 1) - 1);
-    const limit = params.limit ?? 200;
-    return text
-      .split("\n")
-      .slice(offset, offset + limit)
-      .map((line, index) => `${offset + index + 1}\t${line}`)
-      .join("\n");
-  },
-});
-
-export const writeTool = defineTool({
-  name: "write",
-  description: "Write content to a file, creating parent directories.",
-  parameters: Type.Object({
-    path: Type.String({ description: "File path relative to cwd." }),
-    content: Type.String({ description: "Full file content." }),
-  }),
-  execute: async (params, ctx) => {
-    const file = resolveInside(ctx.cwd, params.path);
-    await mkdir(dirname(file), { recursive: true });
-    await writeFile(file, params.content, "utf8");
-    return `Wrote ${file}`;
-  },
-});
-
-export const editTool = defineTool({
-  name: "edit",
-  description: "Replace one exact string in a file.",
-  parameters: Type.Object({
-    path: Type.String({ description: "File path relative to cwd." }),
-    oldString: Type.String({ description: "Exact text to replace." }),
-    newString: Type.String({ description: "Replacement text." }),
-  }),
-  execute: async (params, ctx) => {
-    const file = resolveInside(ctx.cwd, params.path);
-    const text = await readFile(file, "utf8");
-    if (!text.includes(params.oldString)) {
-      throw new Error(`oldString not found in ${params.path}`);
+    const limit = Math.max(1, Math.min(params.limit ?? 200, 1000));
+    if (offset >= lines.length) {
+      return `Offset ${offset + 1} is beyond the end of ${params.path} (${lines.length} lines).`;
     }
-    await writeFile(
-      file,
-      text.replace(params.oldString, params.newString),
-      "utf8",
-    );
-    return `Edited ${file}`;
-  },
-});
 
-export const findTool = defineTool({
-  name: "find",
-  description: "Find files matching a glob pattern.",
-  parameters: Type.Object({
-    pattern: Type.String({
-      description: "Glob pattern, e.g. src/**/*.ts.",
-    }),
-  }),
-  execute: async (params, ctx) => {
-    const glob = new Bun.Glob(params.pattern);
-    const matches: string[] = [];
-    for await (const file of glob.scan({ cwd: ctx.cwd })) {
-      matches.push(file);
+    const end = Math.min(lines.length, offset + limit);
+    const body = formatNumberedLines(lines, offset + 1, end);
+    if (end < lines.length) {
+      return `${body}\n... ${lines.length - end} more lines; use offset=${end + 1}.`;
     }
-    return matches.length
-      ? matches.sort().join("\n")
-      : "No matches found";
+    return body;
   },
 });
 
@@ -107,10 +117,17 @@ export const bashTool = defineTool({
   },
 });
 
+function formatNumberedLines(lines: string[], start: number, end: number): string {
+  return lines
+    .slice(start - 1, end)
+    .map((line, index) => `${start + index}\t${line}`)
+    .join("\n");
+}
+
 export const builtinTools: AnyTool[] = [
   readTool,
-  writeTool,
-  editTool,
-  findTool,
+  applyTool,
+  searchTool,
   bashTool,
 ];
+
